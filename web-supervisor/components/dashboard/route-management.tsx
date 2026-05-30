@@ -293,7 +293,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
     if (!reponedores || reponedores.length === 0 || !pdv.lat || !pdv.lng) return null
     let bestWorker = null, bestScore = Infinity
     reponedores.forEach(w => {
-      if (w.name === pdv.assignedWorker) return
+      if (w.name === pdv.assignedWorker || w.status === 'Completado') return
       const score = getDistance(pdv.lat, pdv.lng, w.lat, w.lng) * 1000 + (w.activeOrders || 0) * 2 + (w.delay ? w.delay * 0.1 : 0)
       if (score < bestScore) { bestScore = score; bestWorker = w }
     })
@@ -384,8 +384,8 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
               {[
                 {
                   label: 'Reponedores en campo',
-                  value: (reponedores || []).length,
-                  sub: 'conectados hoy',
+                  value: (reponedores || []).filter(w => w.status !== 'Completado').length,
+                  sub: 'activos trabajando',
                   color: 'text-foreground',
                   bg: 'bg-muted/30 border-border',
                   icon: '👷'
@@ -596,7 +596,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
                             >
                               <option value="">— Seleccionar reponedor —</option>
                               {reponedores
-                                .filter(w => w.name !== pdv.assignedWorker)
+                                .filter(w => w.name !== pdv.assignedWorker && w.status !== 'Completado')
                                 .map(w => {
                                   const isRec = recommended && (w.id === recommended.id || w.dbUuid === recommended.dbUuid)
                                   return (
