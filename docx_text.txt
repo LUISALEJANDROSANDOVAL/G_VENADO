@@ -1,0 +1,84 @@
+﻿DOCUMENTO DE ESPECIFICACIÃ“N OPERATIVA Y TÃ‰CNICA
+PANEL ADMINISTRATIVO: "THE CONTROL TOWER" (VENADO OPTIROUTE)
+1. INTRODUCCIÃ“N Y PROPÃ“SITO DEL MÃ“DULO
+El mÃ³dulo administrativo, denominado "The Control Tower", es el cerebro estratÃ©gico y logÃ­stico de la plataforma unificada desarrollada para Industrias Venado. Su propÃ³sito fundamental es erradicar la toma de decisiones basada en la intuiciÃ³n y en "tiempos promedio" teÃ³ricos, reemplazÃ¡ndola por una gestiÃ³n de campo cientÃ­fica, automatizada y guiada por datos geogrÃ¡ficos y operativos en tiempo real.
+Este componente central de la arquitectura web (desarrollado en Next.js y Tailwind CSS) le otorga al supervisor de oficina control absoluto sobre la cobertura del Canal Tradicional, permitiÃ©ndole maximizar la productividad de la fuerza de reposiciÃ³n, eliminar saltos logÃ­sticos ineficientes y mitigar de forma proactiva los quiebres de stock en el mercado.
+2. MATRIZ DE RESPONSABILIDADES: Â¿DE QUÃ‰ SE ENCARGA EL ADMINISTRADOR?
+El panel del administrador tiene la responsabilidad exclusiva de orquestar el flujo completo de la informaciÃ³n de campo a travÃ©s de cinco macro-funciones:
+[Ingesta de Datos (.xlsx)] âž” [Motor de Ruteo (PostGIS)] âž” [Live Tracking (WebSockets)] âž” [Feedback Loop Analytics (BI)]
+
+A. Ingesta y Procesamiento de la InformaciÃ³n de Campo
+Carga Masiva de Datos: Debe procesar de manera directa y sin fricciones el archivo maestro proporcionado por la empresa, especÃ­ficamente el archivo "INFORMACION DE DATOS TRADICIONAL LA PAZ rev..xlsx".
+ClasificaciÃ³n DinÃ¡mica: El sistema debe parsear las filas del Excel, extraer las coordenadas geogrÃ¡ficas fijas y catalogar automÃ¡ticamente a los clientes segÃºn su perfil comercial: Pareto, Mayorista o Detallista.
+B. Motor de OptimizaciÃ³n de Rutas (Matriz de Doble Criterio)
+El software administrativo es responsable de ejecutar el algoritmo de ruteo inteligente, cruzando obligatoriamente dos variables crÃ­ticas para generar asignaciones matemÃ¡ticamente Ã³ptimas:
+Criterio Primario (Operativo): Tiempos reales e histÃ³ricos invertidos en el PDV por micro-tarea (limpieza, bandeo, material POP) segÃºn el tipo de cliente.
+Criterio Secundario (LogÃ­stico): Distancias geogrÃ¡ficas reales, kilometraje, densidad de los puntos de venta y tiempos estimados de traslado entre comercios.
+C. Monitoreo GeogrÃ¡fico y de Cobertura en Tiempo Real
+Live Tracking: Renderizar un mapa interactivo centralizado que refleje la ubicaciÃ³n en vivo de los reponedores en las calles de La Paz.
+Control de Avance: Mostrar de forma visual el estado de cada visita y el progreso individual del checklist de micro-tareas de cada operador sin necesidad de recargar el navegador.
+D. GestiÃ³n DinÃ¡mica de Contingencias (Re-enrutamiento en Caliente)
+Alertas Proactivas: El sistema debe identificar desvÃ­os crÃ­ticos (ej. cuando un reponedor tarda mÃ¡s de lo previsto en un cliente Pareto debido a una alta complejidad de ejecuciÃ³n) y alertar al supervisor en rojo.
+ReasignaciÃ³n con un Clic: Permitir al supervisor remover puntos de venta pendientes de un reponedor retrasado e inyectarlos instantÃ¡neamente en la hoja de ruta web de un reponedor cercano con capacidad disponible.
+E. ConsolidaciÃ³n de Inteligencia de Negocios (BI)
+Feedback Loop Continuo: Con cada micro-tarea que el reponedor marca como finalizada en su telÃ©fono, el panel administrativo debe actualizar la base de datos histÃ³rica de tiempos efectivos.
+ExportaciÃ³n de Datos: Consolidar mÃ©tricas de productividad y cobertura en una base estructurada y accionable, utilizable como insumo directo para la toma de decisiones estratÃ©gicas de la gerencia.
+3. REQUISITOS DE CUMPLIMIENTO (Â¿QUÃ‰ DEBE CUMPLIR?)
+Para garantizar el Ã©xito del MVP y alinearse con los criterios de evaluaciÃ³n de la hackatÃ³n, el panel administrativo debe cumplir estrictamente con los siguientes parÃ¡metros tÃ©cnicos y funcionales:
+CÃ³digo
+Requisito Funcional
+Criterio de Cumplimiento TÃ©cnico
+RF-01
+Procesamiento de Archivos
+Soportar la carga del archivo "INFORMACION DE DATOS TRADICIONAL LA PAZ rev..xlsx", validando la estructura de coordenadas sin alterar los datos nativos.
+RF-02
+CÃ¡lculo de Rutas Inteligentes
+El motor debe generar un orden de visita secuencial que minimice el tiempo de traslado combinando tiempos en PDV y distancias PostGIS.
+RF-03
+SincronizaciÃ³n Inmediata
+Las marcas de inicio/fin de micro-tareas realizadas en la vista mÃ³vil del reponedor deben reflejarse en el mapa del administrador en menos de 2 segundos a travÃ©s de WebSockets.
+RF-04
+JerarquÃ­a de VisualizaciÃ³n
+El dashboard debe destacar los indicadores clave (KPIs) de forma clara y scannable: Tasa de Cobertura, Desviaciones del Plan y Alertas de Retraso.
+RF-05
+Almacenamiento de Evidencias
+El panel debe indexar y permitir la visualizaciÃ³n de las fotografÃ­as capturadas en campo asociadas a cada micro-tarea y punto de venta visitado.
+4. ARQUITECTURA DE DESARROLLO: Â¿CÃ“MO DEBE CUMPLIRLO?
+Para implementar la soluciÃ³n en el plazo de 48 horas con la mÃ¡xima calidad visual y solidez tÃ©cnica, se define la siguiente ingenierÃ­a de desarrollo utilizando un ecosistema web unificado:
+A. Capa de PresentaciÃ³n e Interfaz (Frontend)
+Next.js (App Router): Provee una estructura de rutas robusta e inmediata para separar la vista de escritorio del supervisor (/admin) de la vista responsiva del reponedor (/reponedor).
+Tailwind CSS & Componentes Scannable: Garantiza una interfaz limpia basada en tarjetas adaptativas de alto contraste, utilizando paletas de colores especÃ­ficas para identificar alertas crÃ­ticas en segundos (ej. Paretos retrasados en color carmÃ­n).
+Visor de Mapas Fluidos: IntegraciÃ³n de Mapbox GL JS o Leaflet en el cliente de Next.js, optimizado para renderizar cientos de marcadores geogrÃ¡ficos concurrentes de la base de datos de La Paz sin congelar el navegador.
+B. Capa de Datos y Geoprocesamiento (Backend & DB)
+Supabase (PostgreSQL): Funciona como el motor relacional centralizado, gestionando la autenticaciÃ³n de usuarios y estructurando las tablas de puntos de venta y registros de campo.
+ExtensiÃ³n PostGIS: Es la herramienta fundamental activada en PostgreSQL para manejar coordenadas latitud/longitud de manera nativa. PostGIS procesa de forma matemÃ¡tica las distancias geomÃ©tricas directas y la densidad de los PDVs para alimentar el algoritmo de ruteo.
+Supabase Realtime: Habilita canales abiertos mediante WebSockets. Esto permite que el mapa de la "Control Tower" escuche de forma reactiva cualquier mutaciÃ³n en la tabla de marcas de campo del reponedor, actualizando los grÃ¡ficos analÃ­ticos al instante.
+C. LÃ³gica del Algoritmo de Ruteo
+Mapbox Optimization API / OSRM: El backend administrativo toma el listado de coordenadas extraÃ­do del archivo "INFORMACION DE DATOS TRADICIONAL LA PAZ rev..xlsx" junto con los pesos de tiempo por tipo de cliente (con datos de "Grupo V.pdf" y la "Ficha-Tecnica-Industrias Venado.docx.pdf") y los envÃ­a a la API de optimizaciÃ³n para resolver el problema del vendedor viajero (TSP) o ruteo de vehÃ­culos (VRP) de forma automatizada.
+5. FLUJO OPERATIVO DETALLADO DEL SUPERVISOR
+Para asegurar una experiencia de usuario impecable en la oficina, el flujo diario dentro del panel administrativo se ejecuta bajo la siguiente secuencia lÃ³gica:
+[Inicio de Jornada]
+       â”‚
+       â–¼
+1. Carga del archivo "INFORMACION DE DATOS TRADICIONAL LA PAZ rev..xlsx"[cite: 2]
+       â”‚
+       â–¼
+2. El sistema clasifica comercios (Pareto, Mayorista, Detallista) y activa PostGIS
+       â”‚
+       â–¼
+3. El motor calcula y sugiere las rutas diarias Ã³ptimas basadas en el Feedback Loop[cite: 2]
+       â”‚
+       â–¼
+4. El supervisor aprueba el itinerario y las rutas se despliegan en las vistas mÃ³viles[cite: 2]
+       â”‚
+       â–¼
+5. Monitoreo en vivo sobre el mapa interactivo (Control de micro-tareas y retrasos)[cite: 2]
+       â”‚
+       â–¼
+[Contingencia Detectada] âž” 6. Re-enrutamiento dinÃ¡mico con un clic (ReasignaciÃ³n de carga)[cite: 1, 2]
+       â”‚
+       â–¼
+[Fin de Jornada] âž” 7. ConsolidaciÃ³n de datos histÃ³ricos y exportaciÃ³n directa a BI[cite: 2]
+
+Este ecosistema unificado en la web garantiza que Industrias Venado cuente con una plataforma escalable, rÃ¡pida de implementar y con la potencia matemÃ¡tica necesaria para transformar radicalmente la eficiencia operativa de su equipo en campo[cite: 1, 2].
+
