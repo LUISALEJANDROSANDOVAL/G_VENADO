@@ -13,7 +13,7 @@ export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
   const modules = [
     { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
     { id: 'map', label: 'Seguimiento en Vivo', icon: Map },
-    { id: 'routes', label: 'Rutas', icon: Route },
+    { id: 'routes', label: 'Rutas & Historial', icon: Route },
     { id: 'pdv', label: 'Maestro de PDVs', icon: Database },
   ]
 
