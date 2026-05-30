@@ -4,6 +4,8 @@ export type MicroTask = 'Limpieza' | 'Bandeo' | 'POP'
 export type RouteType = 'Urbana' | 'Rural' | 'Carretera'
 export type WorkerStatus = 'En PDV Pareto' | 'En Trayecto' | 'Retrasado' | 'Completado'
 
+export type WeekDay = 'LUN' | 'MAR' | 'MIÉ' | 'JUE' | 'VIE' | 'SÁB'
+
 export interface PDV {
   id: string
   nombre: string
@@ -12,10 +14,12 @@ export interface PDV {
   lng: number
   lastVisit?: string
   visited: boolean
+  availableDays: WeekDay[]
 }
 
 export interface Reponedor {
   id: string
+  dbUuid?: string
   name: string
   route: RouteType
   status: WorkerStatus
@@ -99,8 +103,10 @@ export const generateReponedores = (count: number = 12): Reponedor[] => {
   const reponedores: Reponedor[] = []
   for (let i = 0; i < count; i++) {
     const status = statuses[Math.floor(Math.random() * statuses.length)]
+    const mockId = `REP-${String(i + 1).padStart(3, '0')}`
     reponedores.push({
-      id: `REP-${String(i + 1).padStart(3, '0')}`,
+      id: mockId,
+      dbUuid: mockId,
       name: names[i % names.length],
       route: ['Urbana', 'Rural', 'Carretera'][i % 3] as RouteType,
       status,
