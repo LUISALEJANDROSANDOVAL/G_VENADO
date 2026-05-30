@@ -11,17 +11,17 @@ interface SidebarProps {
 
 export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
   const modules = [
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'map', label: 'Live Tracking', icon: Map },
-    { id: 'routes', label: 'Routes', icon: Route },
-    { id: 'pdv', label: 'PDV Master', icon: Database },
+    { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
+    { id: 'map', label: 'Seguimiento en Vivo', icon: Map },
+    { id: 'routes', label: 'Rutas', icon: Route },
+    { id: 'pdv', label: 'Maestro de PDVs', icon: Database },
   ]
 
   return (
     <aside className="w-64 border-r border-border bg-sidebar min-h-[calc(100vh-64px)]">
       <div className="p-6">
         <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wide mb-4">
-          Modules
+          Módulos
         </p>
         <nav className="space-y-2">
           {modules.map((module) => {
@@ -46,16 +46,16 @@ export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
 
       <div className="border-t border-sidebar-border p-6">
         <div className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wide mb-3">
-          Status
+          Estado
         </div>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-accent"></div>
-            <span className="text-sm text-sidebar-foreground/80">System Online</span>
+            <span className="text-sm text-sidebar-foreground/80">Sistema Activo</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-chart-2"></div>
-            <span className="text-sm text-sidebar-foreground/80">12 Workers Active</span>
+            <span className="text-sm text-sidebar-foreground/80">12 Reponedores Activos</span>
           </div>
         </div>
       </div>

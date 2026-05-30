@@ -34,12 +34,12 @@ export function RouteManagement({ data }: RouteManagementProps) {
           className="gap-2 bg-primary hover:bg-primary/90"
         >
           <Zap className="h-4 w-4" />
-          {isOptimizing ? 'Optimizing...' : 'Re-optimize Routes'}
+          {isOptimizing ? 'Optimizando...' : 'Reoptimizar Rutas'}
         </Button>
         {optimized && (
           <div className="flex items-center gap-2 text-sm font-medium text-accent">
             <div className="h-2 w-2 rounded-full bg-accent"></div>
-            Routes optimized successfully!
+            ¡Rutas optimizadas con éxito!
           </div>
         )}
       </div>
@@ -49,7 +49,7 @@ export function RouteManagement({ data }: RouteManagementProps) {
         {/* Overloaded Workers */}
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-lg">Overloaded Workers</CardTitle>
+            <CardTitle className="text-lg">Reponedores Sobrecargados</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -65,7 +65,7 @@ export function RouteManagement({ data }: RouteManagementProps) {
                       <div className="text-xs text-foreground/60">{worker.id}</div>
                     </div>
                     <Badge variant="destructive" className="text-xs">
-                      {worker.delay}m delay
+                      {worker.delay} min de retraso
                     </Badge>
                   </div>
                   <div className="flex items-start gap-2 text-sm text-foreground/70">
@@ -81,7 +81,7 @@ export function RouteManagement({ data }: RouteManagementProps) {
         {/* Pending At Risk */}
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="text-lg">Pending PDVs at Risk</CardTitle>
+            <CardTitle className="text-lg">PDVs Pendientes en Riesgo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -97,14 +97,14 @@ export function RouteManagement({ data }: RouteManagementProps) {
                       <div className="text-xs text-foreground/60">{pdv.location}</div>
                     </div>
                     <Badge
-                      variant={pdv.priority === 'High' ? 'destructive' : 'secondary'}
+                      variant={pdv.priority === 'Alta' ? 'destructive' : 'secondary'}
                       className="text-xs"
                     >
                       {pdv.priority}
                     </Badge>
                   </div>
                   <div className="text-sm text-foreground/60">
-                    Assigned: <span className="font-medium">{pdv.assignedWorker}</span>
+                    Asignado: <span className="font-medium">{pdv.assignedWorker}</span>
                   </div>
                 </div>
               ))}
@@ -118,17 +118,17 @@ export function RouteManagement({ data }: RouteManagementProps) {
         <CardContent className="pt-6">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <div className="text-foreground/60">Workers to rebalance</div>
+              <div className="text-foreground/60">Reponedores a rebalancear</div>
               <div className="text-2xl font-bold text-foreground mt-1">{data.overloaded.length}</div>
             </div>
             <div>
-              <div className="text-foreground/60">PDVs at risk</div>
+              <div className="text-foreground/60">PDVs en riesgo</div>
               <div className="text-2xl font-bold text-foreground mt-1">{data.pendingRisk.length}</div>
             </div>
             <div>
-              <div className="text-foreground/60">High priority</div>
+              <div className="text-foreground/60">Prioridad alta</div>
               <div className="text-2xl font-bold text-destructive mt-1">
-                {data.pendingRisk.filter((p) => p.priority === 'High').length}
+                {data.pendingRisk.filter((p) => p.priority === 'Alta').length}
               </div>
             </div>
           </div>

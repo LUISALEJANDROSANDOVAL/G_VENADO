@@ -1,7 +1,7 @@
 // Mock data types and generators
 export type ClientType = 'Pareto' | 'Mayorista' | 'Detallista'
-export type MicroTask = 'Cleaning' | 'Bandeo' | 'POP'
-export type RouteType = 'Urban' | 'Rural' | 'Highway'
+export type MicroTask = 'Limpieza' | 'Bandeo' | 'POP'
+export type RouteType = 'Urbana' | 'Rural' | 'Carretera'
 export type WorkerStatus = 'En PDV Pareto' | 'En Trayecto' | 'Retrasado' | 'Completado'
 
 export interface PDV {
@@ -59,7 +59,7 @@ export interface RouteOptData {
     name: string
     location: string
     assignedWorker: string
-    priority: 'High' | 'Medium' | 'Low'
+    priority: 'Alta' | 'Media' | 'Baja'
   }>
 }
 
@@ -102,7 +102,7 @@ export const generateReponedores = (count: number = 12): Reponedor[] => {
     reponedores.push({
       id: `REP-${String(i + 1).padStart(3, '0')}`,
       name: names[i % names.length],
-      route: ['Urban', 'Rural', 'Highway'][i % 3] as RouteType,
+      route: ['Urbana', 'Rural', 'Carretera'][i % 3] as RouteType,
       status,
       currentPDV: `PDV-${String(Math.floor(Math.random() * 100) + 1).padStart(4, '0')}`,
       routeProgress: Math.random() * 100,
@@ -126,7 +126,7 @@ export const generateKPIData = (): KPIData => {
 export const generateAnalyticsData = (): AnalyticsData => {
   return {
     effectiveMinutes: [
-      { microTask: 'Cleaning', Pareto: 240, Mayorista: 180, Detallista: 120 },
+      { microTask: 'Limpieza', Pareto: 240, Mayorista: 180, Detallista: 120 },
       { microTask: 'Bandeo', Pareto: 300, Mayorista: 200, Detallista: 140 },
       { microTask: 'POP', Pareto: 180, Mayorista: 140, Detallista: 90 },
     ],
@@ -148,9 +148,9 @@ export const generateRouteOptData = (): RouteOptData => {
       { id: 'REP-003', name: 'José Torres', delay: 32, reason: 'Tráfico intenso en ruta principal' },
     ],
     pendingRisk: [
-      { id: 'PDV-0087', name: 'Bodega Sur', location: 'La Boca', assignedWorker: 'Maria López', priority: 'High' },
-      { id: 'PDV-0132', name: 'Supermercado Este', location: 'Flores', assignedWorker: 'Unassigned', priority: 'High' },
-      { id: 'PDV-0045', name: 'Mini Market Centro', location: 'San Telmo', assignedWorker: 'David Pérez', priority: 'Medium' },
+      { id: 'PDV-0087', name: 'Bodega Sur', location: 'La Boca', assignedWorker: 'Maria López', priority: 'Alta' },
+      { id: 'PDV-0132', name: 'Supermercado Este', location: 'Flores', assignedWorker: 'Sin asignar', priority: 'Alta' },
+      { id: 'PDV-0045', name: 'Mini Market Centro', location: 'San Telmo', assignedWorker: 'David Pérez', priority: 'Media' },
     ],
   }
 }

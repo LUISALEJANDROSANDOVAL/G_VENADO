@@ -12,8 +12,8 @@ export function Navbar() {
             <div className="text-primary-foreground font-bold text-lg">C</div>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-lg font-bold text-foreground">Control Tower</h1>
-            <p className="text-xs text-muted-foreground">Field Operations</p>
+            <h1 className="text-lg font-bold text-foreground">Torre de Control</h1>
+            <p className="text-xs text-muted-foreground">Operaciones de Campo</p>
           </div>
         </div>
 

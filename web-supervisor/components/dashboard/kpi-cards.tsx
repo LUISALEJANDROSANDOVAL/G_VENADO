@@ -13,7 +13,7 @@ export function KPICards({ data }: KPICardsProps) {
   const kpis = [
     {
       icon: TrendingUp,
-      label: 'Daily Coverage Rate',
+      label: 'Tasa de Cobertura Diaria',
       value: `${data.coverageRate.toFixed(1)}%`,
       progress: data.coverageRate,
       color: 'bg-chart-1',
@@ -21,7 +21,7 @@ export function KPICards({ data }: KPICardsProps) {
     },
     {
       icon: Clock,
-      label: 'Avg Time Deviation',
+      label: 'Desviación Promedio de Tiempo',
       value: `${data.timeDeviation.toFixed(1)} min`,
       progress: Math.min(data.timeDeviation, 100),
       color: 'bg-chart-4',
@@ -29,7 +29,7 @@ export function KPICards({ data }: KPICardsProps) {
     },
     {
       icon: Users,
-      label: 'Active Workers',
+      label: 'Reponedores Activos',
       value: `${data.activeWorkers}/${data.totalWorkers}`,
       progress: (data.activeWorkers / data.totalWorkers) * 100,
       color: 'bg-chart-2',
@@ -37,7 +37,7 @@ export function KPICards({ data }: KPICardsProps) {
     },
     {
       icon: AlertCircle,
-      label: 'Critical Alerts',
+      label: 'Alertas Críticas',
       value: data.criticalAlerts.toString(),
       progress: data.criticalAlerts * 25,
       color: 'bg-destructive',

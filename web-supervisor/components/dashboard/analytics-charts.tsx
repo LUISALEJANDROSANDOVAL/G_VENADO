@@ -14,8 +14,8 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
       {/* Effective Minutes Chart */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle>Effective Minutes by Task</CardTitle>
-          <CardDescription>Time spent on each micro-task by client type</CardDescription>
+          <CardTitle>Minutos Efectivos por Tarea</CardTitle>
+          <CardDescription>Tiempo dedicado a cada microtarea por tipo de cliente</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -43,8 +43,8 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
       {/* Route Compliance Timeline */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle>Route Compliance Timeline</CardTitle>
-          <CardDescription>On-time vs delayed visits throughout the day</CardDescription>
+          <CardTitle>Cumplimiento de Rutas en el Tiempo</CardTitle>
+          <CardDescription>Visitas a tiempo vs retrasadas a lo largo del día</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -67,7 +67,7 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
                 strokeWidth={2}
                 dot={{ fill: 'hsl(var(--chart-2))', r: 4 }}
                 activeDot={{ r: 6 }}
-                name="On-Time"
+                name="A tiempo"
               />
               <Line 
                 type="monotone" 
@@ -76,7 +76,7 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
                 strokeWidth={2}
                 dot={{ fill: 'hsl(var(--chart-4))', r: 4 }}
                 activeDot={{ r: 6 }}
-                name="Delayed"
+                name="Con retraso"
               />
             </LineChart>
           </ResponsiveContainer>

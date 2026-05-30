@@ -43,7 +43,7 @@ export default function ControlTowerDashboard() {
         <>
           <Navbar />
           <div className="flex items-center justify-center h-screen">
-            <p className="text-muted-foreground">Loading dashboard...</p>
+            <p className="text-muted-foreground">Cargando panel de control...</p>
           </div>
         </>
       ) : (
@@ -57,8 +57,8 @@ export default function ControlTowerDashboard() {
                 {activeModule === 'analytics' && (
                   <div className="space-y-8 animate-in fade-in">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard Analytics</h1>
-                      <p className="text-muted-foreground">Real-time performance metrics and insights</p>
+                      <h1 className="text-3xl font-bold text-foreground mb-2">Analíticas del Panel</h1>
+                      <p className="text-muted-foreground">Métricas de rendimiento e información en tiempo real</p>
                     </div>
 
                     <KPICards data={mockData.kpis} />
@@ -70,8 +70,8 @@ export default function ControlTowerDashboard() {
                 {activeModule === 'map' && (
                   <div className="space-y-8 animate-in fade-in">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Live Field Operations</h1>
-                      <p className="text-muted-foreground">Real-time tracking and worker management</p>
+                      <h1 className="text-3xl font-bold text-foreground mb-2">Operaciones de Campo en Vivo</h1>
+                      <p className="text-muted-foreground">Seguimiento en tiempo real y gestión de trabajadores</p>
                     </div>
 
                     <LiveMap pdvs={mockData.pdvs} reponedores={mockData.reponedores} />
@@ -82,8 +82,8 @@ export default function ControlTowerDashboard() {
                 {activeModule === 'routes' && (
                   <div className="space-y-8 animate-in fade-in">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Route Optimization</h1>
-                      <p className="text-muted-foreground">Manage loads, reassign workers, and optimize routes</p>
+                      <h1 className="text-3xl font-bold text-foreground mb-2">Optimización de Rutas</h1>
+                      <p className="text-muted-foreground">Gestionar cargas, reasignar reponedores y optimizar rutas</p>
                     </div>
 
                     <RouteManagement data={mockData.routeOpt} />
@@ -94,8 +94,8 @@ export default function ControlTowerDashboard() {
                 {activeModule === 'pdv' && (
                   <div className="space-y-8 animate-in fade-in">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">PDV Master Data</h1>
-                      <p className="text-muted-foreground">Manage and search point of sale locations</p>
+                      <h1 className="text-3xl font-bold text-foreground mb-2">Datos Maestros de PDV</h1>
+                      <p className="text-muted-foreground">Gestionar y buscar ubicaciones de puntos de venta</p>
                     </div>
 
                     <PDVMaster pdvs={mockData.pdvs} />

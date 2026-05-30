@@ -65,8 +65,8 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
           <div className="flex items-center justify-center gap-4 py-8 cursor-pointer hover:bg-muted/30 rounded-lg transition-colors">
             <Upload className="h-6 w-6 text-muted-foreground" />
             <div>
-              <p className="font-medium text-foreground">Drop CSV or Excel file here</p>
-              <p className="text-sm text-muted-foreground">to update PDV Master data</p>
+              <p className="font-medium text-foreground">Arrastre el archivo CSV o Excel aquí</p>
+              <p className="text-sm text-muted-foreground">para actualizar los datos maestros de PDV</p>
             </div>
           </div>
         </CardContent>
@@ -77,7 +77,7 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search by name or ID..."
+            placeholder="Buscar por nombre o ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -85,10 +85,10 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
         </div>
         <Select value={filterType} onValueChange={(v) => setFilterType(v as ClientType | 'all')}>
           <SelectTrigger className="w-full md:w-40">
-            <SelectValue placeholder="Filter by type" />
+            <SelectValue placeholder="Filtrar por tipo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">Todos los tipos</SelectItem>
             <SelectItem value="Pareto">Pareto</SelectItem>
             <SelectItem value="Mayorista">Mayorista</SelectItem>
             <SelectItem value="Detallista">Detallista</SelectItem>
@@ -96,12 +96,12 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
         </Select>
         <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'visited' | 'unvisited')}>
           <SelectTrigger className="w-full md:w-40">
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder="Filtrar por estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="visited">Visited</SelectItem>
-            <SelectItem value="unvisited">Unvisited</SelectItem>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="visited">Visitado</SelectItem>
+            <SelectItem value="unvisited">No visitado</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -110,9 +110,9 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
       <Card className="border-border">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle>PDV Master Data</CardTitle>
+            <CardTitle>Datos Maestros de PDV</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Showing {filteredPDVs.length} of {pdvs.length} PDVs
+              Mostrando {filteredPDVs.length} de {pdvs.length} PDVs
             </p>
           </div>
         </CardHeader>
@@ -121,12 +121,12 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-foreground/70">PDV ID</TableHead>
-                  <TableHead className="text-foreground/70">Business Name</TableHead>
-                  <TableHead className="text-foreground/70">Classification</TableHead>
-                  <TableHead className="text-foreground/70">Coordinates</TableHead>
-                  <TableHead className="text-foreground/70">Last Visit</TableHead>
-                  <TableHead className="text-foreground/70 text-right">Status</TableHead>
+                  <TableHead className="text-foreground/70">ID de PDV</TableHead>
+                  <TableHead className="text-foreground/70">Nombre Comercial</TableHead>
+                  <TableHead className="text-foreground/70">Clasificación</TableHead>
+                  <TableHead className="text-foreground/70">Coordenadas</TableHead>
+                  <TableHead className="text-foreground/70">Última Visita</TableHead>
+                  <TableHead className="text-foreground/70 text-right">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,11 +143,11 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
                       {pdv.lat.toFixed(5)}, {pdv.lng.toFixed(5)}
                     </TableCell>
                     <TableCell className="text-sm text-foreground/60">
-                      {pdv.lastVisit ? new Date(pdv.lastVisit).toLocaleDateString() : 'Never'}
+                      {pdv.lastVisit ? new Date(pdv.lastVisit).toLocaleDateString() : 'Nunca'}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant={pdv.visited ? 'secondary' : 'outline'} className="text-xs">
-                        {pdv.visited ? 'Visited' : 'Unvisited'}
+                        {pdv.visited ? 'Visitado' : 'No visitado'}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -157,7 +157,7 @@ export function PDVMaster({ pdvs }: PDVMasterProps) {
           </div>
           {filteredPDVs.length === 0 && (
             <div className="py-12 text-center">
-              <p className="text-muted-foreground">No PDVs match your filters</p>
+              <p className="text-muted-foreground">Ningún PDV coincide con los filtros</p>
             </div>
           )}
         </CardContent>

@@ -34,7 +34,7 @@ export function LiveMap({ pdvs, reponedores }: LiveMapProps) {
       {/* Map Container */}
       <Card className="lg:col-span-3 border-border">
         <CardHeader>
-          <CardTitle>Live Field Operations Map</CardTitle>
+          <CardTitle>Mapa de Operaciones de Campo en Vivo</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="bg-slate-100 rounded-lg overflow-hidden relative">
@@ -80,19 +80,19 @@ export function LiveMap({ pdvs, reponedores }: LiveMapProps) {
           <div className="mt-4 flex gap-6 text-sm">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-red-500"></div>
-              <span className="text-foreground/70">Pareto PDVs</span>
+              <span className="text-foreground/70">PDVs Pareto</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              <span className="text-foreground/70">Mayorista PDVs</span>
+              <span className="text-foreground/70">PDVs Mayoristas</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-gray-400"></div>
-              <span className="text-foreground/70">Detallista PDVs</span>
+              <span className="text-foreground/70">PDVs Detallistas</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full border-2 border-emerald-500 bg-transparent"></div>
-              <span className="text-foreground/70">Active Workers</span>
+              <span className="text-foreground/70">Reponedores Activos</span>
             </div>
           </div>
         </CardContent>
@@ -101,7 +101,7 @@ export function LiveMap({ pdvs, reponedores }: LiveMapProps) {
       {/* Reponedor List Sidebar */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-lg">Active Workers</CardTitle>
+          <CardTitle className="text-lg">Reponedores Activos</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -119,12 +119,12 @@ export function LiveMap({ pdvs, reponedores }: LiveMapProps) {
                 </div>
                 {worker.delay > 0 && (
                   <div className="mt-2 text-xs text-destructive font-medium">
-                    {worker.delay}min delay
+                    {worker.delay.toFixed(0)} min de retraso
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-foreground/60">{worker.routeProgress.toFixed(0)}% done</span>
-                  <span className="text-foreground/60">{worker.activeOrders} orders</span>
+                  <span className="text-foreground/60">{worker.routeProgress.toFixed(0)}% completado</span>
+                  <span className="text-foreground/60">{worker.activeOrders} órdenes</span>
                 </div>
               </div>
             ))}
