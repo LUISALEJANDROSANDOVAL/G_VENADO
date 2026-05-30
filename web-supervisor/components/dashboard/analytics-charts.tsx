@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { AnalyticsData } from '@/lib/mock-data'
 
@@ -22,7 +22,17 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
             <BarChart data={data.effectiveMinutes}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="microTask" stroke="var(--foreground)" />
-              <YAxis stroke="var(--foreground)" />
+              <YAxis 
+                stroke="var(--foreground)" 
+                label={{ 
+                  value: 'Minutos', 
+                  angle: -90, 
+                  position: 'insideLeft', 
+                  offset: 0, 
+                  fill: 'var(--foreground)',
+                  style: { textAnchor: 'middle', fontWeight: '500' }
+                }} 
+              />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'var(--card)', 
@@ -30,6 +40,11 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
                   borderRadius: '4px'
                 }}
                 cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                formatter={(value: any, name: string) => {
+                  const estimates: Record<string, number> = { Pareto: 200, Mayorista: 150, Detallista: 100 }
+                  const est = estimates[name] || Math.round(value * 0.8)
+                  return [`${value} min reales vs ${est} min estimados`, name]
+                }}
               />
               <Legend />
               <Bar dataKey="Pareto" stackId="a" fill="hsl(var(--chart-1))" />
@@ -51,7 +66,20 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
             <LineChart data={data.routeCompliance}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="time" stroke="var(--foreground)" />
-              <YAxis stroke="var(--foreground)" />
+              <YAxis stroke="var(--foreground)" domain={[0, 14]} />
+              <ReferenceLine 
+                y={10.8} 
+                stroke="#10b981" 
+                strokeDasharray="4 4" 
+                strokeWidth={1.5}
+                label={{ 
+                  value: 'Meta (90%)', 
+                  position: 'top', 
+                  fill: '#10b981', 
+                  fontSize: 10, 
+                  fontWeight: '700' 
+                }} 
+              />
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'var(--card)', 
