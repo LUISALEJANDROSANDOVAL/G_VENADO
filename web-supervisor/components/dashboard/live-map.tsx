@@ -12,22 +12,26 @@ import type { PDV } from '@/lib/mock-data'
 interface LiveMapProps {
   pdvs: PDV[]
   reponedores: any[]
+  selectedWorkerId?: string | null
+  onSelectWorkerId?: (id: string | null) => void
 }
 
-export function LiveMap({ pdvs, reponedores }: LiveMapProps) {
+export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorkerId, onSelectWorkerId }: LiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const [animationTime, setAnimationTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [speedMultiplier, setSpeedMultiplier] = useState(1)
-  // null = show all, string = filter to this worker's dbUuid/id
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
+
+  const [internalSelectedWorkerId, setInternalSelectedWorkerId] = useState<string | null>(null)
+  const selectedWorkerId = propSelectedWorkerId !== undefined ? propSelectedWorkerId : internalSelectedWorkerId
+  const setSelectedWorkerId = onSelectWorkerId || setInternalSelectedWorkerId
 
   // Only show workers who are still actively working
   const activeReponedores = reponedores.filter(w => w.status !== 'Completado')
 
   const selectedWorker = selectedWorkerId
-    ? activeReponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId) ?? null
+    ? reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId) ?? null
     : null
 
   // Update animation phase for moving worker markers

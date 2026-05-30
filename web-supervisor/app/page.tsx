@@ -32,6 +32,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function ControlTowerDashboard() {
   const [activeModule, setActiveModule] = useState('analytics')
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
   const [mockData, setMockData] = useState<{
     pdvs: any[]
     reponedores: any[]
@@ -184,7 +185,12 @@ export default function ControlTowerDashboard() {
                       <p className="text-muted-foreground">Seguimiento en tiempo real y gestión de trabajadores</p>
                     </div>
 
-                    <LiveMap pdvs={mockData.pdvs} reponedores={mockData.reponedores} />
+                    <LiveMap
+                      pdvs={mockData.pdvs}
+                      reponedores={mockData.reponedores}
+                      selectedWorkerId={selectedWorkerId}
+                      onSelectWorkerId={setSelectedWorkerId}
+                    />
                   </div>
                 )}
 
@@ -200,7 +206,12 @@ export default function ControlTowerDashboard() {
                       data={mockData.routeOpt}
                       reponedores={mockData.reponedores}
                       photoEvidences={mockData.photoEvidences || []}
+                      pdvs={mockData.pdvs}
                       onRefresh={loadData}
+                      onViewOnMap={(workerId) => {
+                        setSelectedWorkerId(workerId)
+                        setActiveModule('map')
+                      }}
                     />
                   </div>
                 )}

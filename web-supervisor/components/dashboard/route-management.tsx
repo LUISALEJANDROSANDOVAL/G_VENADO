@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   AlertTriangle, Zap, Check, Loader2, History, ChevronDown, ChevronRight,
   Camera, Clock, User, Store, MapPin, X, ArrowRight
@@ -32,13 +32,16 @@ interface RouteHistoryEntry {
   completedCount: number
   status: 'Completada' | 'En Proceso' | 'Asignada'
   evidences: PhotoEvidence[]
+  sequence: string[]
 }
 
 interface RouteManagementProps {
   data: RouteOptData & { logisticAdjustments?: any[] }
   reponedores?: any[]
   photoEvidences?: PhotoEvidence[]
+  pdvs?: any[]
   onRefresh?: () => void
+  onViewOnMap?: (workerId: string) => void
 }
 
 // ─── Task color map ──────────────────────────────────────────────────────────
@@ -83,8 +86,154 @@ function PhotoPanel({
   )
 }
 
+// ─── Route History Map Modal (Client-side Leaflet) ──────────────────────────
+function RouteHistoryMapModal({
+  isOpen,
+  onClose,
+  reponedorName,
+  sequence,
+  pdvs,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  reponedorName: string
+  sequence: string[]
+  pdvs: any[]
+}) {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    let mapInstance: any = null
+    let active = true
+
+    import('leaflet').then((LModule) => {
+      if (!active) return
+      const L = LModule.default
+      
+      if (!mapContainerRef.current) return
+
+      // Initialize map
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: true,
+        scrollWheelZoom: true,
+      }).setView([-34.61, -58.44], 12)
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map)
+
+      mapInstance = map
+      mapRef.current = map
+
+      const markerGroup = L.layerGroup().addTo(map)
+
+      // Build coordinates and draw markers
+      const points: L.LatLngTuple[] = []
+      sequence.forEach((pdvId, idx) => {
+        const pdv = pdvs.find(p => p.id === pdvId)
+        if (pdv) {
+          const lat = parseFloat(pdv.lat)
+          const lng = parseFloat(pdv.lng)
+          points.push([lat, lng])
+
+          // Add circle marker for each stop
+          const marker = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: '#10b981', // green for completed
+            color: '#ffffff',
+            weight: 2,
+            opacity: 0.9,
+            fillOpacity: 0.95,
+          }).addTo(markerGroup)
+
+          // Bind stop sequence number
+          marker.bindTooltip(`${idx + 1}`, {
+            permanent: true,
+            direction: 'top',
+            className: 'pdv-sequence-badge pdv-visited-badge',
+            offset: [0, -3]
+          })
+
+          marker.bindPopup(`
+            <div style="font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.4; color: #1f2937;">
+              <h4 style="margin:0 0 3px 0;font-size:13px;font-weight:700;color:#111827;">${pdv.nombre || pdv.name}</h4>
+              <div>Parada #${idx + 1} · ${pdv.type}</div>
+              <div style="color:#059669;font-weight:bold;margin-top:2px;">✓ Completado</div>
+            </div>
+          `)
+        }
+      })
+
+      // Draw route polyline
+      if (points.length > 1) {
+        L.polyline(points, {
+          color: '#10b981',
+          weight: 4,
+          opacity: 0.85,
+        }).addTo(markerGroup)
+
+        // Fit bounds
+        try {
+          map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 })
+        } catch (_) {}
+      }
+    })
+
+    return () => {
+      active = false
+      if (mapInstance) {
+        mapInstance.remove()
+      }
+    }
+  }, [isOpen, sequence, pdvs])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+      <Card 
+        className="relative w-full max-w-3xl overflow-hidden shadow-2xl border border-border bg-card"
+        onClick={e => e.stopPropagation()}
+      >
+        <CardHeader className="flex flex-row items-center justify-between pb-3 space-y-0">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+              <MapPin className="h-5 w-5 text-emerald-500" />
+              Ruta Histórica Realizada — {reponedorName}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Jornada completada de {sequence.length} visitas
+            </CardDescription>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0 border-t border-border">
+          <div className="bg-slate-100 h-[420px] w-full relative">
+            <div ref={mapContainerRef} className="h-full w-full z-0" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ─── Route History Row ────────────────────────────────────────────────────────
-function RouteHistoryRow({ entry, onZoom }: { entry: RouteHistoryEntry; onZoom: (u: string) => void }) {
+function RouteHistoryRow({ 
+  entry, 
+  pdvs, 
+  onZoom, 
+  onViewOnMap 
+}: { 
+  entry: RouteHistoryEntry; 
+  pdvs: any[]; 
+  onZoom: (u: string) => void;
+  onViewOnMap?: (workerId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false)
   const pct = entry.pdvCount > 0 ? Math.round((entry.completedCount / entry.pdvCount) * 100) : 0
 
@@ -97,9 +246,17 @@ function RouteHistoryRow({ entry, onZoom }: { entry: RouteHistoryEntry; onZoom: 
   return (
     <div className="border border-border rounded-xl overflow-hidden transition-all duration-200">
       {/* Clickable header row */}
-      <button
-        className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors"
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-primary"
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setExpanded(!expanded)
+          }
+        }}
       >
         {/* Expand icon */}
         <div className="shrink-0 text-muted-foreground">
@@ -140,63 +297,138 @@ function RouteHistoryRow({ entry, onZoom }: { entry: RouteHistoryEntry; onZoom: 
             {entry.evidences.length} evidencias
           </span>
         )}
-      </button>
 
-      {/* Expanded: evidence cards */}
+        {/* View on Map Button */}
+        {onViewOnMap && (
+          <Button
+            size="xs"
+            variant="outline"
+            className="h-7 px-2.5 gap-1 text-[10px] bg-primary/10 border-primary/20 hover:bg-primary hover:text-primary-foreground text-primary shrink-0 transition-all duration-200 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation()
+              onViewOnMap(entry.id)
+            }}
+          >
+            <MapPin className="h-3 w-3" /> Ver en Mapa
+          </Button>
+        )}
+      </div>
+
+      {/* Expanded: route sequence + evidence cards */}
       {expanded && (
         <div className="border-t border-border bg-muted/10 px-5 py-4">
-          {entry.evidences.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-sm flex flex-col items-center gap-2">
-              <Camera className="h-8 w-8 text-muted-foreground/30" />
-              <p>No hay evidencias fotográficas registradas para esta jornada.</p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <Camera className="h-3.5 w-3.5" />
-                Evidencias de auditoría — {entry.reponedorName}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left Column: Route Sequence */}
+            <div className="lg:col-span-1 border-r border-border/40 pr-6 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                <Store className="h-3.5 w-3.5 text-primary" />
+                Secuencia de Visitas ({entry.completedCount}/{entry.pdvCount})
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {entry.evidences.map((ev) => (
-                  <div key={ev.id} className="bg-card border border-border rounded-xl overflow-hidden">
-                    {/* Card header */}
-                    <div className="px-3 pt-3 pb-2">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <Store className="h-3 w-3 text-primary shrink-0" />
-                        <p className="text-xs font-semibold text-foreground truncate">{ev.pdvName}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] font-bold border ${TASK_COLORS[ev.taskName] ?? 'bg-muted/50 text-muted-foreground border-border'}`}
-                        >
-                          {ev.taskName}
-                        </Badge>
-                        <span className="text-[9px] text-muted-foreground">
-                          {new Date(ev.timestamp).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+              
+              <div className="relative pl-4 border-l border-border ml-2 space-y-4">
+                {entry.sequence.map((pdvId, idx) => {
+                  const pdv = pdvs.find(p => p.id === pdvId)
+                  const isCompleted = idx < entry.completedCount
+                  const isNext = !isCompleted && idx === entry.completedCount
+                  
+                  if (!pdv) return null
+                  
+                  return (
+                    <div key={pdvId} className="relative flex items-start gap-2.5">
+                      {/* Timeline dot */}
+                      <div className={[
+                        "absolute -left-[22px] w-2.5 h-2.5 rounded-full border-2 bg-card",
+                        isCompleted 
+                          ? "border-emerald-500 bg-emerald-500" 
+                          : isNext 
+                          ? "border-primary bg-primary animate-pulse" 
+                          : "border-muted-foreground/45 bg-muted"
+                      ].join(" ")} />
+                      
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-xs font-semibold truncate ${isCompleted ? 'text-foreground/80 line-through decoration-emerald-500/50' : 'text-foreground'}`}>
+                            {idx + 1}. {pdv.nombre || pdv.name}
+                          </span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-muted border border-border text-muted-foreground">
+                            {pdv.type}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          {isCompleted 
+                            ? "✓ Completado" 
+                            : isNext 
+                            ? "⏳ Próxima parada" 
+                            : "💤 Pendiente"}
+                        </p>
                       </div>
                     </div>
-
-                    {/* Antes / Después */}
-                    <div className="px-3 pb-3 flex gap-2">
-                      <PhotoPanel label="Antes" url={ev.beforeUrl} taskName={ev.taskName} onZoom={onZoom} />
-                      <div className="flex items-center shrink-0">
-                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <PhotoPanel label="Después" url={ev.afterUrl} taskName={ev.taskName} onZoom={onZoom} />
-                    </div>
-
-                    {/* Completion pill */}
-                    <div className={`mx-3 mb-3 flex items-center gap-1 text-[10px] font-medium rounded px-2 py-1
-                      ${ev.afterUrl ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                      {ev.afterUrl ? '✓ Ciclo completo' : '⏳ Cierre pendiente'}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
+                {entry.sequence.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic pl-2">Sin secuencia de visitas registrada.</p>
+                )}
               </div>
-            </>
-          )}
+            </div>
+
+            {/* Right Column: Evidence cards */}
+            <div className="lg:col-span-2 space-y-3">
+              {entry.evidences.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm flex flex-col items-center justify-center h-full gap-2">
+                  <Camera className="h-8 w-8 text-muted-foreground/30" />
+                  <p>No hay evidencias fotográficas registradas para esta jornada.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                    <Camera className="h-3.5 w-3.5 text-primary" />
+                    Evidencias de auditoría
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {entry.evidences.map((ev) => (
+                      <div key={ev.id} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                        {/* Card header */}
+                        <div className="px-3 pt-3 pb-2">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <Store className="h-3 w-3 text-primary shrink-0" />
+                            <p className="text-xs font-semibold text-foreground truncate">{ev.pdvName}</p>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] font-bold border ${TASK_COLORS[ev.taskName] ?? 'bg-muted/50 text-muted-foreground border-border'}`}
+                            >
+                              {ev.taskName}
+                            </Badge>
+                            <span className="text-[9px] text-muted-foreground">
+                              {new Date(ev.timestamp).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Antes / Después */}
+                        <div className="px-3 pb-3 flex gap-2">
+                          <PhotoPanel label="Antes" url={ev.beforeUrl} taskName={ev.taskName} onZoom={onZoom} />
+                          <div className="flex items-center shrink-0">
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          </div>
+                          <PhotoPanel label="Después" url={ev.afterUrl} taskName={ev.taskName} onZoom={onZoom} />
+                        </div>
+
+                        {/* Completion pill */}
+                        <div className={`mx-3 mb-3 flex items-center gap-1 text-[10px] font-medium rounded px-2 py-1
+                          ${ev.afterUrl ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                          {ev.afterUrl ? '✓ Ciclo completo' : '⏳ Cierre pendiente'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+          </div>
         </div>
       )}
     </div>
@@ -204,12 +436,13 @@ function RouteHistoryRow({ entry, onZoom }: { entry: RouteHistoryEntry; onZoom: 
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function RouteManagement({ data, reponedores, photoEvidences = [], onRefresh }: RouteManagementProps) {
+export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs = [], onRefresh, onViewOnMap }: RouteManagementProps) {
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [optimized, setOptimized] = useState(false)
   const [isReassigning, setIsReassigning] = useState(false)
   const [isApproving, setIsApproving] = useState<string | null>(null)
   const [selectedTargets, setSelectedTargets] = useState<Record<string, string>>({})
+  const [modalMapRoute, setModalMapRoute] = useState<{ reponedorName: string; sequence: string[] } | null>(null)
   const [optimizeStep, setOptimizeStep] = useState(0)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'operations' | 'history'>('operations')
@@ -323,7 +556,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
   const routeHistory: RouteHistoryEntry[] = (reponedores || []).map((w, idx) => {
     const statuses = ['Completada', 'En Proceso', 'Asignada'] as const
     const status = statuses[idx % statuses.length]
-    const pdvCount = w.activeOrders ? w.activeOrders + Math.floor(Math.random() * 3) + 3 : 8
+    const pdvCount = w.sequence ? w.sequence.length : w.activeOrders ? w.activeOrders + Math.floor(Math.random() * 3) + 3 : 8
     const completedCount = status === 'Completada' ? pdvCount : Math.max(0, pdvCount - (w.activeOrders || 2))
     const todayStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long' })
 
@@ -334,9 +567,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
       pdvCount,
       completedCount,
       status,
-      evidences: evidencesByWorker[w.name] || []
+      evidences: evidencesByWorker[w.name] || [],
+      sequence: w.sequence || []
     }
-  })
+  }).filter(entry => entry.status === 'Completada')
 
   return (
     <div className="space-y-6">
@@ -723,19 +957,26 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
               {routeHistory.length} jornadas registradas · Haz clic en una fila para ver las evidencias fotográficas
             </p>
             <div className="flex gap-2 text-[10px]">
-              {(['Completada', 'En Proceso', 'Asignada'] as const).map(s => (
-                <span key={s} className={`px-2 py-0.5 rounded-full border font-medium ${
-                  s === 'Completada' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : s === 'En Proceso' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  : 'bg-muted/30 text-muted-foreground border-border'
-                }`}>{s}</span>
-              ))}
+              <span className="px-2 py-0.5 rounded-full border font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                Solo Completadas
+              </span>
             </div>
           </div>
 
           <div className="space-y-2">
             {routeHistory.map(entry => (
-              <RouteHistoryRow key={entry.id} entry={entry} onZoom={setSelectedPhoto} />
+              <RouteHistoryRow
+                key={entry.id}
+                entry={entry}
+                pdvs={pdvs || []}
+                onViewOnMap={() => {
+                  setModalMapRoute({
+                    reponedorName: entry.reponedorName,
+                    sequence: entry.sequence,
+                  })
+                }}
+                onZoom={setSelectedPhoto}
+              />
             ))}
             {routeHistory.length === 0 && (
               <div className="py-16 text-center text-muted-foreground">
@@ -767,6 +1008,14 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], onRefr
           </div>
         </div>
       )}
+      {/* ── Route History Map Modal ── */}
+      <RouteHistoryMapModal
+        isOpen={modalMapRoute !== null}
+        onClose={() => setModalMapRoute(null)}
+        reponedorName={modalMapRoute?.reponedorName || ''}
+        sequence={modalMapRoute?.sequence || []}
+        pdvs={pdvs || []}
+      />
     </div>
   )
 }
