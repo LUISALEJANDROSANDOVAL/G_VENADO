@@ -7,6 +7,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards'
 import { AnalyticsCharts } from '@/components/dashboard/analytics-charts'
 import { RouteManagement } from '@/components/dashboard/route-management'
 import { PDVMaster } from '@/components/dashboard/pdv-master'
+import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import dynamic from 'next/dynamic'
 
 const LiveMap = dynamic(
@@ -31,7 +32,7 @@ import { getDashboardData, seedDatabase } from '@/app/actions'
 import { supabase } from '@/lib/supabase'
 
 export default function ControlTowerDashboard() {
-  const [activeModule, setActiveModule] = useState('analytics')
+  const [activeModule, setActiveModule] = useState('dashboard')
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
   const [mockData, setMockData] = useState<{
     pdvs: any[]
@@ -164,6 +165,20 @@ export default function ControlTowerDashboard() {
             <Sidebar activeModule={activeModule} onModuleChange={setActiveModule} />
             <main className="flex-1 overflow-auto">
               <div className="p-6 md:p-8 max-w-7xl mx-auto">
+                {/* Main Dashboard Module */}
+                {activeModule === 'dashboard' && (
+                  <MainDashboard
+                    pdvs={mockData.pdvs}
+                    reponedores={mockData.reponedores}
+                    kpis={mockData.kpis}
+                    onViewOnMap={(workerId) => {
+                      setSelectedWorkerId(workerId)
+                      setActiveModule('map')
+                    }}
+                    onModuleChange={setActiveModule}
+                  />
+                )}
+
                 {/* Analytics Module */}
                 {activeModule === 'analytics' && (
                   <div className="space-y-8 animate-in fade-in">
