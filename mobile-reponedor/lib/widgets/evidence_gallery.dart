@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/enums.dart';
 import '../models/evidence.dart';
@@ -97,6 +99,40 @@ class _EvidenceThumbnail extends StatelessWidget {
       EvidenceType.general => 'General',
     };
 
+    final hasImage = evidence.filePath != null || evidence.publicUrl != null;
+
+    Widget buildImageWidget() {
+      if (evidence.publicUrl != null && evidence.publicUrl!.isNotEmpty) {
+        return Image.network(
+          evidence.publicUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.broken_image_outlined, color: AppColors.error),
+          ),
+        );
+      }
+      if (evidence.filePath != null && evidence.filePath!.isNotEmpty) {
+        if (kIsWeb) {
+          return Image.network(
+            evidence.filePath!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(Icons.broken_image_outlined, color: AppColors.error),
+            ),
+          );
+        } else {
+          return Image.file(
+            File(evidence.filePath!),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(Icons.broken_image_outlined, color: AppColors.error),
+            ),
+          );
+        }
+      }
+      return const SizedBox();
+    }
+
     return GestureDetector(
       onTap: evidence.status != EvidenceStatus.pendiente ? onTap : null,
       child: SizedBox(
@@ -118,33 +154,40 @@ class _EvidenceThumbnail extends StatelessWidget {
                         : statusColor,
                   ),
                 ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Icon(
-                        evidence.status == EvidenceStatus.pendiente
-                            ? Icons.add_a_photo_outlined
-                            : Icons.image_outlined,
-                        color: AppColors.primaryText.withValues(alpha: 0.5),
-                        size: 32,
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.darkBackground.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(6),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (hasImage)
+                        buildImageWidget()
+                      else
+                        Center(
+                          child: Icon(
+                            evidence.status == EvidenceStatus.pendiente
+                                ? Icons.add_a_photo_outlined
+                                : Icons.image_outlined,
+                            color: AppColors.primaryText.withValues(alpha: 0.5),
+                            size: 32,
+                          ),
                         ),
-                        child: Text(
-                          typeLabel,
-                          style: const TextStyle(fontSize: 9, color: AppColors.snow),
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.darkBackground.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            typeLabel,
+                            style: const TextStyle(fontSize: 9, color: AppColors.snow),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -163,45 +206,95 @@ class _EvidenceThumbnail extends StatelessWidget {
   }
 }
 
-/// Preview fullscreen mock de evidencia.
+/// Preview fullscreen de evidencia.
 void showEvidencePreview(BuildContext context, Evidence evidence) {
+  Widget buildPreviewImage() {
+    if (evidence.publicUrl != null && evidence.publicUrl!.isNotEmpty) {
+      return Image.network(
+        evidence.publicUrl!,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Icon(Icons.broken_image, size: 64, color: AppColors.error),
+        ),
+      );
+    }
+    if (evidence.filePath != null && evidence.filePath!.isNotEmpty) {
+      if (kIsWeb) {
+        return Image.network(
+          evidence.filePath!,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.broken_image, size: 64, color: AppColors.error),
+          ),
+        );
+      } else {
+        return Image.file(
+          File(evidence.filePath!),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.broken_image, size: 64, color: AppColors.error),
+          ),
+        );
+      }
+    }
+    return Container(
+      color: evidence.mockColor,
+      child: const Center(
+        child: Icon(Icons.image, size: 64, color: AppColors.snow),
+      ),
+    );
+  }
+
   showDialog<void>(
     context: context,
     builder: (context) => Dialog(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: AppColors.cardBackground,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            height: 280,
+            height: 320,
             width: double.infinity,
-            color: evidence.mockColor,
+            color: Colors.black,
+            child: buildPreviewImage(),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.photo, size: 64, color: AppColors.snow),
-                const SizedBox(height: 12),
                 Text(
                   evidence.label,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Simulación — preview de evidencia',
-                  style: Theme.of(context).textTheme.bodySmall,
+                if (evidence.publicUrl != null) ...[
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Sincronizado con Supabase Storage ✓',
+                    style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ] else if (evidence.filePath != null) ...[
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Guardado localmente',
+                    style: TextStyle(color: AppColors.warning, fontSize: 11),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cerrar'),
+                  ),
                 ),
               ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cerrar'),
-              ),
             ),
           ),
         ],

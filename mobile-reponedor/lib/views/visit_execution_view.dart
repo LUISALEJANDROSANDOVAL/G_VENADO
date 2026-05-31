@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/evidence.dart';
@@ -202,6 +203,72 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     final type = await showEvidenceCaptureDialog(context);
     if (type == null || !mounted) return;
 
+    final picker = ImagePicker();
+    XFile? imageFile;
+    try {
+      imageFile = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // ignore: avoid_print
+      print('[VisitExecutionView] Error abriendo la cámara: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al acceder a la cámara: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (imageFile == null) return;
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Subiendo foto a Supabase Storage...'),
+          ],
+        ),
+        duration: Duration(days: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    String? publicUrl;
+    bool isUploaded = false;
+
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final fileName = '${type.name}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      publicUrl = await RouteRepository.instance.uploadEvidence(
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: 'image/jpeg',
+      );
+      
+      if (publicUrl != null) {
+        isUploaded = true;
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VisitExecutionView] Error subiendo archivo: $e');
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+
     setState(() {
       final evidences = List<Evidence>.from(_visit.evidences);
       final pendingIndex = evidences.indexWhere(
@@ -214,25 +281,24 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
         EvidenceType.general => AppColors.cornflowerBlue,
       };
 
+      final newEvidence = Evidence(
+        id: pendingIndex != -1 ? evidences[pendingIndex].id : 'e-${evidences.length + 1}',
+        label: switch (type) {
+          EvidenceType.antes => 'Antes',
+          EvidenceType.despues => 'Después',
+          EvidenceType.general => 'Evidencia ${evidences.length + 1}',
+        },
+        status: isUploaded ? EvidenceStatus.sincronizada : EvidenceStatus.capturada,
+        type: type,
+        mockColor: color,
+        filePath: imageFile!.path,
+        publicUrl: publicUrl,
+      );
+
       if (pendingIndex != -1) {
-        evidences[pendingIndex] = evidences[pendingIndex].copyWith(
-          status: EvidenceStatus.capturada,
-          mockColor: color,
-        );
+        evidences[pendingIndex] = newEvidence;
       } else {
-        evidences.add(
-          Evidence(
-            id: 'e-${evidences.length + 1}',
-            label: switch (type) {
-              EvidenceType.antes => 'Antes',
-              EvidenceType.despues => 'Después',
-              EvidenceType.general => 'Evidencia ${evidences.length + 1}',
-            },
-            status: EvidenceStatus.capturada,
-            type: type,
-            mockColor: color,
-          ),
-        );
+        evidences.add(newEvidence);
       }
       _visit = _visit.copyWith(evidences: evidences);
     });
@@ -240,7 +306,12 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Simulación: evidencia "${type.name}" capturada'),
+        content: Text(
+          isUploaded 
+              ? 'Evidencia "${type.name}" sincronizada con Supabase ✓'
+              : 'Evidencia "${type.name}" guardada localmente',
+        ),
+        backgroundColor: isUploaded ? AppColors.success : AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -266,30 +337,42 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     });
 
     try {
-      if (!AppConnectionService.instance.isOffline) {
-        final now = DateTime.now();
-        final start = _visit.arrivalTime;
-        
-        for (final task in _visit.tasks) {
-          if (task.isCompleted) {
-            final duration = task.accumulatedSeconds > 0 
-                ? task.accumulatedSeconds 
-                : 300; // 5 minutos por defecto
+      final now = DateTime.now();
+      final start = _visit.arrivalTime;
+      
+      for (final task in _visit.tasks) {
+        if (task.isCompleted) {
+          final duration = task.accumulatedSeconds > 0 
+              ? task.accumulatedSeconds 
+              : 300;
+          
+          String? photoUrl;
+          if (task.requiresPhoto) {
+            final uploadedEv = _visit.evidences.firstWhere(
+              (e) => e.status != EvidenceStatus.pendiente && (e.publicUrl != null || e.filePath != null),
+              orElse: () => const Evidence(
+                id: '',
+                label: '',
+                status: EvidenceStatus.pendiente,
+                type: EvidenceType.general,
+              ),
+            );
             
-            String? photoUrl;
-            if (task.requiresPhoto) {
+            if (uploadedEv.id.isNotEmpty) {
+              photoUrl = uploadedEv.publicUrl ?? uploadedEv.filePath;
+            } else {
               photoUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
             }
-
-            await RouteRepository.instance.saveTaskLog(
-              posId: _visit.pdv.id,
-              taskId: int.tryParse(task.id) ?? 1,
-              startTime: start,
-              endTime: now,
-              durationSeconds: duration,
-              photoUrl: photoUrl,
-            );
           }
+
+          await RouteRepository.instance.saveTaskLog(
+            posId: _visit.pdv.id,
+            taskId: int.tryParse(task.id) ?? 1,
+            startTime: start,
+            endTime: now,
+            durationSeconds: duration,
+            photoUrl: photoUrl,
+          );
         }
       }
     } catch (e) {
@@ -301,7 +384,10 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
 
     if (!mounted) return;
 
-    final completedVisit = _visit.copyWith(syncStatus: SyncStatus.sincronizado);
+    final isOffline = AppConnectionService.instance.isOffline;
+    final completedVisit = _visit.copyWith(
+      syncStatus: isOffline ? SyncStatus.pendiente : SyncStatus.sincronizado,
+    );
     final nextPdv = MockData.nextPendingPdv(widget.allPdvs, afterPdvId: _visit.pdv.id);
 
     widget.onVisitCompleted?.call(completedVisit);
@@ -312,12 +398,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
       elapsedSeconds: _elapsedSeconds,
       nextPdv: nextPdv,
       onDone: () {
-        if (AppConnectionService.instance.isOffline) {
-          AppConnectionService.instance.addPendingSync();
-        } else {
-          AppConnectionService.instance.addPendingSync();
-          AppConnectionService.instance.simulateBackgroundSync();
-        }
+        AppConnectionService.instance.refreshPendingCount();
       },
     );
   }
