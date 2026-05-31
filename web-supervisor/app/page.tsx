@@ -11,6 +11,7 @@ import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import dynamic from 'next/dynamic'
 import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table, Globe } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { Login } from '@/components/auth/login'
 
 const LiveMap = dynamic(
   () => import('@/components/dashboard/live-map').then((mod) => mod.LiveMap),
@@ -34,6 +35,8 @@ import { getDashboardData, seedDatabase } from '@/app/actions'
 import { supabase } from '@/lib/supabase'
 
 export default function ControlTowerDashboard() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [activeModule, setActiveModule] = useState('dashboard')
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
   const [mockData, setMockData] = useState<{
@@ -59,6 +62,15 @@ export default function ControlTowerDashboard() {
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [exportNotification, setExportNotification] = useState('')
   const { toast } = useToast()
+
+  useEffect(() => {
+    // Check if the user is already logged in
+    const session = localStorage.getItem('supervisor_session')
+    if (session) {
+      setIsLoggedIn(true)
+    }
+    setIsCheckingAuth(false)
+  }, [])
 
   const handleExport = (format: string) => {
     setShowExportDropdown(false)
@@ -256,6 +268,8 @@ export default function ControlTowerDashboard() {
   }
 
   useEffect(() => {
+    if (!isLoggedIn) return
+
     loadData()
 
     // Subscribe to task_logs and daily_routes_plan updates in real-time
@@ -274,7 +288,7 @@ export default function ControlTowerDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [isLoggedIn])
 
   const handleSeed = async () => {
     setIsSeeding(true)
@@ -291,6 +305,18 @@ export default function ControlTowerDashboard() {
     } finally {
       setIsSeeding(false)
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <p className="text-muted-foreground animate-pulse font-medium">Verificando sesión...</p>
+      </div>
+    )
+  }
+
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={() => setIsLoggedIn(true)} />
   }
 
   return (

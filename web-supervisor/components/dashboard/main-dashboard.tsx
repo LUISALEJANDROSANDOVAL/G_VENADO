@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { KPICards } from './kpi-cards'
-import { Users, CheckCircle, AlertTriangle, Eye, ArrowRight, ShieldAlert, Clock, CheckSquare, XSquare, Camera, X, Search, SlidersHorizontal, TrendingUp, Sun, Cloud, CloudRain, Car, Bell, AlertCircle, MapPin, PackageX } from 'lucide-react'
+import { Users, CheckCircle, AlertTriangle, Eye, ArrowRight, ShieldAlert, Clock, CheckSquare, XSquare, X, Search, SlidersHorizontal, TrendingUp, Sun, Cloud, CloudRain, Car, Bell, AlertCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 
@@ -21,7 +21,6 @@ interface MainDashboardProps {
 }
 
 export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], onViewOnMap, onModuleChange }: MainDashboardProps) {
-  const [selectedZoomPhoto, setSelectedZoomPhoto] = useState<string | null>(null)
   const [isStaffListExpanded, setIsStaffListExpanded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [routeFilter, setRouteFilter] = useState('Todos')
@@ -30,11 +29,6 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
   // External factors & quick action states
   const [isBlockadeDeclared, setIsBlockadeDeclared] = useState(false)
   const [notificationSentStatus, setNotificationSentStatus] = useState<string | null>(null)
-  const [stockoutAlerts, setStockoutAlerts] = useState([
-    { id: 'so-1', product: 'Mayonesa Kris 500g', pdv: 'Supermercado Fidalga Centro', time: 'Hace 12 min', managed: false },
-    { id: 'so-2', product: 'Salsa de Tomate Kris 400g', pdv: 'Hipermaxi Equipetrol', time: 'Hace 35 min', managed: false },
-    { id: 'so-3', product: 'Ketchup Kris 250g', pdv: 'Micromercado IC Norte', time: 'Hace 1 hora', managed: false }
-  ])
 
   // Real-time weather data state connected to Open-Meteo API
   const [weatherData, setWeatherData] = useState<{
@@ -573,80 +567,6 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             </CardContent>
           </Card>
 
-          {/* Muro de Evidencias en Vivo (Live Photo Feed) */}
-          <Card className="border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Camera className="h-5 w-5 text-emerald-600" />
-                Evidencias Recientes en Vivo
-              </CardTitle>
-              <CardDescription>Últimas fotografías de auditoría reportadas en tiempo real por el personal</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {photoEvidences.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
-                  <Camera className="h-8 w-8 text-muted-foreground/30" />
-                  <p>No hay evidencias fotográficas registradas hoy.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {(photoEvidences || []).slice(0, 3).map((ev) => {
-                    const displayUrl = ev.afterUrl || ev.beforeUrl
-                    return (
-                      <div key={ev.id} className="group relative bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-emerald-500/30 transition-all flex flex-col justify-between">
-                        {/* Card Header (PDV and Reponedor) */}
-                        <div className="p-3 bg-muted/10 border-b border-border/40">
-                          <p className="text-xs font-bold text-foreground truncate" title={ev.pdvName}>
-                            {ev.pdvName}
-                          </p>
-                          <div className="flex justify-between items-center mt-1">
-                            <span className="text-[10px] text-muted-foreground truncate max-w-[90px]">
-                              {ev.reponedorName}
-                            </span>
-                            <Badge variant="outline" className="text-[8px] font-bold px-1 py-0 border-emerald-500/20 text-emerald-600 bg-emerald-500/5">
-                              {ev.taskName}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Image Preview Container */}
-                        <div 
-                          className="relative aspect-video bg-slate-900 flex items-center justify-center overflow-hidden cursor-zoom-in"
-                          onClick={() => setSelectedZoomPhoto(displayUrl)}
-                        >
-                          {displayUrl ? (
-                            <img 
-                              src={displayUrl} 
-                              alt={`${ev.taskName} - ${ev.pdvName}`} 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="text-xs text-muted-foreground">Sin foto</div>
-                          )}
-                          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-[9px] text-white px-2 py-0.5 rounded font-semibold">
-                            {ev.afterUrl ? 'Después (Cierre)' : 'Antes (Inicio)'}
-                          </div>
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Eye className="h-5 w-5 text-white drop-shadow" />
-                          </div>
-                        </div>
-
-                        {/* Footer (Timestamp) */}
-                        <div className="p-2 border-t border-border/40 bg-muted/5 flex justify-between items-center text-[9px] text-muted-foreground">
-                          <span className="italic">
-                            {ev.afterUrl ? 'Ciclo completo' : 'Cierre pendiente'}
-                          </span>
-                          <span className="font-semibold">
-                            {new Date(ev.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
         </div>
 
@@ -760,69 +680,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             </CardContent>
           </Card>
 
-          {/* Stockout Alerts Widget */}
-          <Card className="border-border shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                  <PackageX className="h-4.5 w-4.5 text-rose-500" />
-                  Quiebres de Stock ({stockoutAlerts.filter(a => !a.managed).length})
-                </CardTitle>
-                {stockoutAlerts.filter(a => !a.managed).length > 0 && (
-                  <Badge className="bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0 border-none animate-pulse">CRÍTICO</Badge>
-                )}
-              </div>
-              <CardDescription className="text-[11px]">Productos Venado sin disponibilidad detectados en góndola</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {stockoutAlerts.filter(a => !a.managed).length === 0 ? (
-                <div className="py-4 text-center text-muted-foreground text-xs flex flex-col items-center gap-1.5">
-                  <CheckCircle className="h-7 w-7 text-emerald-500" />
-                  Todos los quiebres de stock han sido gestionados.
-                </div>
-              ) : (
-                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-2.5">
-                  {stockoutAlerts.map((alert) => (
-                    <div 
-                      key={alert.id}
-                      className={[
-                        "p-3 rounded-xl border transition-all flex flex-col gap-2",
-                        alert.managed 
-                          ? "bg-muted/40 border-border/40 opacity-60" 
-                          : "bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10"
-                      ].join(" ")}
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-foreground">{alert.product}</p>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate max-w-[150px]">{alert.pdv}</span>
-                          </div>
-                        </div>
-                        <span className="text-[9px] text-muted-foreground font-medium whitespace-nowrap">{alert.time}</span>
-                      </div>
-                      
-                      {!alert.managed && (
-                        <div className="flex justify-end gap-2 mt-1">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              setStockoutAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, managed: true } : a))
-                            }}
-                            className="h-6 px-2.5 text-[9px] font-bold rounded-lg border-rose-500/20 text-rose-600 hover:text-rose-700 hover:bg-rose-500/5 cursor-pointer"
-                          >
-                            Marcar como Gestionado
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Quick Stats Summary */}
           <Card className="border-border">
@@ -927,27 +785,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
 
       </div>
 
-      {/* Photo Zoom Modal */}
-      {selectedZoomPhoto && (
-        <div
-          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm transition-all duration-200 animate-in fade-in"
-          onClick={() => setSelectedZoomPhoto(null)}
-        >
-          <div
-            className="relative max-w-4xl w-full max-h-[88vh] rounded-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
-            <img src={selectedZoomPhoto} alt="Evidencia ampliada" className="w-full h-auto max-h-[88vh] object-contain mx-auto" />
-            <button
-              className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-full p-2.5 transition-colors flex items-center gap-1.5 text-xs cursor-pointer shadow-lg border border-white/10"
-              onClick={() => setSelectedZoomPhoto(null)}
-            >
-              <X className="h-4 w-4" />
-              <span>Cerrar</span>
-            </button>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }
