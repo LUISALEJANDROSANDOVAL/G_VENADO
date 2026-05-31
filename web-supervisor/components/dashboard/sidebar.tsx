@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart3, Map, Route, Database } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Map, Route, Database } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -11,9 +11,10 @@ interface SidebarProps {
 
 export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
   const modules = [
-    { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
+    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
     { id: 'map', label: 'Seguimiento en Vivo', icon: Map },
     { id: 'routes', label: 'Rutas & Historial', icon: Route },
+    { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
     { id: 'pdv', label: 'Maestro de PDVs', icon: Database },
   ]
 
