@@ -181,6 +181,10 @@ class RouteRepository {
 
   /// Registra el log de una tarea en la tabla `task_logs` de Supabase, o en la
   /// cola local offline si no hay conexión (RF-10).
+  ///
+  /// [localPhotoPath] es la ruta del archivo de foto en el dispositivo.
+  /// Si el dispositivo está offline, se incluye en el payload para que
+  /// [AppConnectionService.syncOfflineData] pueda re-subirla al recuperar señal.
   Future<void> saveTaskLog({
     required String posId,
     required int taskId,
@@ -188,15 +192,20 @@ class RouteRepository {
     required DateTime endTime,
     required int durationSeconds,
     String? photoUrl,
+    String? localPhotoPath,
     bool isOffline = false,
   }) async {
     final planId = _cachedRoutePlanId ?? 'demo_plan';
     if (planId == 'demo_plan') {
       // ignore: avoid_print
-      print('[RouteRepository] Modo Demostración/Fallback: Evitando inserción en base de datos para no causar error de tipo UUID ("demo_plan").');
+      print('[RouteRepository] Modo Demo: sin inserción en BD para evitar error UUID.');
       return;
     }
-    final logPayload = {
+
+    final isCurrentlyOffline = isOffline || AppConnectionService.instance.isOffline;
+
+    // Payload completo para la cola offline (incluye ruta local de foto)
+    final offlinePayload = <String, dynamic>{
       'route_plan_id': planId,
       'pos_id': posId,
       'task_id': taskId,
@@ -204,27 +213,36 @@ class RouteRepository {
       'end_time': endTime.toUtc().toIso8601String(),
       'duration_seconds': durationSeconds,
       'photo_url': photoUrl,
-      'is_offline': isOffline || AppConnectionService.instance.isOffline,
+      'local_photo_path': localPhotoPath,
+      'user_id': SessionService.instance.currentUserId,
+      'is_offline': isCurrentlyOffline,
+    };
+
+    // Payload limpio para Supabase (solo columnas de la tabla)
+    final supabasePayload = <String, dynamic>{
+      'route_plan_id': planId,
+      'pos_id': posId,
+      'task_id': taskId,
+      'start_time': startTime.toUtc().toIso8601String(),
+      'end_time': endTime.toUtc().toIso8601String(),
+      'duration_seconds': durationSeconds,
+      'photo_url': photoUrl,
+      'is_offline': isCurrentlyOffline,
     };
 
     try {
       if (AppConnectionService.instance.isOffline) {
-        await OfflineSyncService.instance.savePendingTaskLog(logPayload);
+        await OfflineSyncService.instance.savePendingTaskLog(offlinePayload);
         await AppConnectionService.instance.refreshPendingCount();
         return;
       }
 
-      await SupabaseService.client.from('task_logs').insert(logPayload);
+      await SupabaseService.client.from('task_logs').insert(supabasePayload);
     } catch (e) {
       // ignore: avoid_print
       print('[RouteRepository] Error guardando log de tarea (online/offline): $e');
-      
-      if (!AppConnectionService.instance.isOffline) {
-        await OfflineSyncService.instance.savePendingTaskLog(logPayload);
-        await AppConnectionService.instance.refreshPendingCount();
-      } else {
-        rethrow;
-      }
+      await OfflineSyncService.instance.savePendingTaskLog(offlinePayload);
+      await AppConnectionService.instance.refreshPendingCount();
     }
   }
 
@@ -241,13 +259,13 @@ class RouteRepository {
       final planId = _cachedRoutePlanId ?? 'demo_plan';
       final path = '$userId/$planId/$fileName';
 
-      await client.storage.from('evidencias').uploadBinary(
+      await client.storage.from('task-evidences').uploadBinary(
             path,
             bytes,
             fileOptions: FileOptions(contentType: mimeType),
           );
 
-      final publicUrl = client.storage.from('evidencias').getPublicUrl(path);
+      final publicUrl = client.storage.from('task-evidences').getPublicUrl(path);
       return publicUrl;
     } catch (e) {
       // ignore: avoid_print

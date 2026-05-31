@@ -2,26 +2,30 @@ import 'package:flutter/material.dart';
 import '../models/enums.dart';
 import '../theme/app_colors.dart';
 
-/// Chip de geofence con acción para simular llegada (demo web).
-/// TODO: Conectar con GpsService en producción.
+/// Chip de estado de geofence — 100% GPS real.
+/// 
+/// - Si el PDV tiene lat/lng reales: muestra estado GPS y espera detección automática.
+/// - Si el PDV no tiene coordenadas: el checklist ya fue habilitado desde [_startGeofenceCheck].
 class GeofenceStatusChip extends StatelessWidget {
   const GeofenceStatusChip({
     super.key,
     required this.status,
-    this.onSimulateArrival,
-    this.canSimulate = true,
+    this.hasPdvCoordinates = false,
   });
 
   final GeofenceStatus status;
-  final VoidCallback? onSimulateArrival;
-  final bool canSimulate;
+
+  /// Si es true, el PDV tiene lat/lng reales y el GPS automático gestiona el geofence.
+  final bool hasPdvCoordinates;
 
   @override
   Widget build(BuildContext context) {
     final (label, description, color, icon) = switch (status) {
       GeofenceStatus.fueraDelPdv => (
           'Fuera del PDV',
-          'Acércate al comercio para habilitar el checklist',
+          hasPdvCoordinates
+              ? 'Acércate al comercio — el GPS detectará tu llegada automáticamente'
+              : 'Confirma tu llegada al comercio para habilitar el checklist',
           AppColors.error,
           Icons.location_off,
         ),
@@ -38,6 +42,9 @@ class GeofenceStatusChip extends StatelessWidget {
           Icons.verified_outlined,
         ),
     };
+
+    // Si no tiene coordenadas GPS el checklist ya está habilitado automáticamente.
+    // Este chip solo informa el estado actual.
 
     return Container(
       width: double.infinity,
@@ -77,29 +84,16 @@ class GeofenceStatusChip extends StatelessWidget {
                   ],
                 ),
               ),
+              // Indicador de GPS automático activo
+              if (hasPdvCoordinates && status == GeofenceStatus.fueraDelPdv)
+                Tooltip(
+                  message: 'GPS automático activo',
+                  child: Icon(Icons.gps_fixed, color: color.withValues(alpha: 0.7), size: 18),
+                ),
             ],
           ),
-          if (status == GeofenceStatus.fueraDelPdv && canSimulate && onSimulateArrival != null) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: onSimulateArrival,
-                icon: const Icon(Icons.near_me, size: 18),
-                label: const Text('Simular llegada al PDV'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: color,
-                  side: BorderSide(color: color, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
-

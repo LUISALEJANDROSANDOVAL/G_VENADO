@@ -36,11 +36,13 @@ class _RouteViewState extends State<RouteView> {
   void initState() {
     super.initState();
     _loadRoute();
-    // Iniciar rastreo GPS de manera preventiva si hay sesión
-    unawaited(GpsService.instance.startLiveTracking());
+    // El GPS se inicia dentro de _loadRoute() una vez que se
+    // confirma la sesión del usuario, para garantizar que
+    // SessionService.currentUserId no sea null al primer ciclo.
   }
 
   /// Carga la ruta desde Supabase (RF-06/RF-07) con fallback a MockData.
+  /// Inicia el GPS en cuanto el userId está disponible (RF-08).
   Future<void> _loadRoute() async {
     setState(() {
       _isLoadingRoute = true;
@@ -56,6 +58,10 @@ class _RouteViewState extends State<RouteView> {
           _isLoadingRoute = false;
         });
       }
+      // Iniciar GPS DESPUÉS de confirmar la sesión, así userId no es null
+      if (userId != null && userId.isNotEmpty) {
+        unawaited(GpsService.instance.startLiveTracking());
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -63,6 +69,11 @@ class _RouteViewState extends State<RouteView> {
           _isLoadingRoute = false;
           _loadError = e.toString();
         });
+      }
+      // Intentar iniciar GPS igualmente si hay sesión
+      final userId = SessionService.instance.currentUserId;
+      if (userId != null && userId.isNotEmpty) {
+        unawaited(GpsService.instance.startLiveTracking());
       }
     }
   }
@@ -258,11 +269,6 @@ class _RouteViewState extends State<RouteView> {
       appBar: AppBar(
         title: const Text('Mi Ruta'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.wifi_find),
-            tooltip: 'Simular conexión',
-            onPressed: AppConnectionService.instance.cycleStatusDemo,
-          ),
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sincronizar',
@@ -496,7 +502,7 @@ class _GpsTrackingHint extends StatelessWidget {
         Icon(Icons.gps_fixed, size: 14, color: AppColors.success.withValues(alpha: 0.8)),
         const SizedBox(width: 6),
         Text(
-          'Rastreo de trayecto activo — cada 30 s (simulación RF-08)',
+          'Rastreo GPS activo — posición enviada cada 30 s',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
         ),
       ],

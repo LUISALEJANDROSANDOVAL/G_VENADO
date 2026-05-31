@@ -71,10 +71,17 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     final pdvLng = _visit.pdv.longitude;
 
     if (pdvLat == null || pdvLng == null) {
-      // El PDV no tiene coordenadas GPS reales — el reponedor usa el botón manual.
+      // El PDV no tiene coordenadas GPS registradas.
+      // Habilitar el checklist de inmediato para no bloquear el trabajo.
+      if (mounted) {
+        setState(() {
+          _visit = _visit.copyWith(geofenceStatus: GeofenceStatus.dentroDelRadio);
+        });
+      }
       return;
     }
 
+    // El PDV tiene coordenadas reales: GPS automático cada 10 segundos.
     _geofenceTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
       final isInside = GpsService.instance.isInsidePdv(
@@ -132,17 +139,6 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  void _simulateArrival() {
-    setState(() {
-      _visit = _visit.copyWith(geofenceStatus: GeofenceStatus.dentroDelRadio);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Geofence: dentro del radio — checklist habilitado'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   void _onTaskChecked(int index, bool? value) {
     if (!_checklistEnabled) return;
@@ -328,6 +324,13 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
       return;
     }
 
+    // Cancelar timers antes de cualquier operación async para evitar
+    // que disparen setState sobre el widget desmontado.
+    _visitTimer?.cancel();
+    _visitTimer = null;
+    _geofenceTimer?.cancel();
+    _geofenceTimer = null;
+
     setState(() {
       _isFinishing = true;
       _visit = _visit.copyWith(
@@ -347,6 +350,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
               : 300;
           
           String? photoUrl;
+          String? localPhotoPath;
           if (task.requiresPhoto) {
             final uploadedEv = _visit.evidences.firstWhere(
               (e) => e.status != EvidenceStatus.pendiente && (e.publicUrl != null || e.filePath != null),
@@ -357,11 +361,12 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
                 type: EvidenceType.general,
               ),
             );
-            
+
             if (uploadedEv.id.isNotEmpty) {
-              photoUrl = uploadedEv.publicUrl ?? uploadedEv.filePath;
-            } else {
-              photoUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
+              // Foto sincronizada: usar URL pública de Supabase Storage
+              // Foto local (sin señal): guardar ruta local para re-subir al sync
+              photoUrl = uploadedEv.publicUrl;
+              localPhotoPath = uploadedEv.filePath;
             }
           }
 
@@ -372,6 +377,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
             endTime: now,
             durationSeconds: duration,
             photoUrl: photoUrl,
+            localPhotoPath: localPhotoPath,
           );
         }
       }
@@ -390,7 +396,11 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     );
     final nextPdv = MockData.nextPendingPdv(widget.allPdvs, afterPdvId: _visit.pdv.id);
 
+    // Notificar al padre ANTES de navegar para que actualice la lista
+    // mientras la RouteView todavía está montada en el stack.
     widget.onVisitCompleted?.call(completedVisit);
+
+    if (!mounted) return;
 
     navigateToVisitSummary(
       context,
@@ -409,24 +419,19 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
       appBar: AppBar(
         title: Text(_visit.pdv.name, overflow: TextOverflow.ellipsis),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _checklistEnabled ? _takeEvidence : null,
-        icon: const Icon(Icons.camera_alt),
-        label: const Text('Tomar Evidencia'),
-      ),
       body: Column(
         children: [
           const OfflineBanner(),
           _buildFixedHeader(context),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
                 _buildChronometer(context),
                 const SizedBox(height: 16),
                 GeofenceStatusChip(
                   status: _visit.geofenceStatus,
-                  onSimulateArrival: _simulateArrival,
+                  hasPdvCoordinates: _visit.pdv.latitude != null && _visit.pdv.longitude != null,
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -559,28 +564,57 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
   Widget _buildFinishButton() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: const BoxDecoration(
         color: AppColors.cardBackground,
         border: Border(top: BorderSide(color: AppColors.inputBorder)),
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _isFinishing ? null : _finishVisit,
-            child: _isFinishing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Finalizar Visita y Sincronizar'),
-          ),
+        child: Row(
+          children: [
+            // Botón cámara: solo activo cuando el checklist está habilitado
+            SizedBox(
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: _checklistEnabled && !_isFinishing ? _takeEvidence : null,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Evidencia'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: _checklistEnabled
+                        ? AppColors.institutionalBlue
+                        : AppColors.inputBorder,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Botón principal: Finalizar Visita
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _isFinishing ? null : _finishVisit,
+                  child: _isFinishing
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Finalizar Visita'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
