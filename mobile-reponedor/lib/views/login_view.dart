@@ -229,15 +229,12 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  /// Logo una sola vez — tamaño fijo, fondo rojo continuo.
+  /// Logo centrado sin barra de fondo roja.
   Widget _buildHeader() {
-    return ColoredBox(
-      color: TraceLoginColors.headerRed,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Center(
-          child: TraceLogo(width: 140, height: 140),
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: TraceLogo(width: 140, height: 140),
       ),
     );
   }

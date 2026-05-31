@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/pdv.dart';
 import '../models/task.dart';
+import 'app_connection_service.dart';
+import 'offline_sync_service.dart';
 import 'supabase_service.dart';
 
 /// Repositorio de Rutas y PDVs.
@@ -174,7 +178,8 @@ class RouteRepository {
     }
   }
 
-  /// Registra el log de una tarea en la tabla `task_logs` de Supabase.
+  /// Registra el log de una tarea en la tabla `task_logs` de Supabase, o en la
+  /// cola local offline si no hay conexión (RF-10).
   Future<void> saveTaskLog({
     required String posId,
     required int taskId,
@@ -184,24 +189,64 @@ class RouteRepository {
     String? photoUrl,
     bool isOffline = false,
   }) async {
-    try {
-      final planId = _cachedRoutePlanId;
-      if (planId == null) return;
+    final planId = _cachedRoutePlanId ?? 'demo_plan';
+    final logPayload = {
+      'route_plan_id': planId,
+      'pos_id': posId,
+      'task_id': taskId,
+      'start_time': startTime.toUtc().toIso8601String(),
+      'end_time': endTime.toUtc().toIso8601String(),
+      'duration_seconds': durationSeconds,
+      'photo_url': photoUrl,
+      'is_offline': isOffline || AppConnectionService.instance.isOffline,
+    };
 
-      await SupabaseService.client.from('task_logs').insert({
-        'route_plan_id': planId,
-        'pos_id': posId,
-        'task_id': taskId,
-        'start_time': startTime.toUtc().toIso8601String(),
-        'end_time': endTime.toUtc().toIso8601String(),
-        'duration_seconds': durationSeconds,
-        'photo_url': photoUrl,
-        'is_offline': isOffline,
-      });
+    try {
+      if (AppConnectionService.instance.isOffline) {
+        await OfflineSyncService.instance.savePendingTaskLog(logPayload);
+        await AppConnectionService.instance.refreshPendingCount();
+        return;
+      }
+
+      await SupabaseService.client.from('task_logs').insert(logPayload);
     } catch (e) {
       // ignore: avoid_print
-      print('[RouteRepository] Error guardando log de tarea: $e');
-      rethrow;
+      print('[RouteRepository] Error guardando log de tarea (online/offline): $e');
+      
+      if (!AppConnectionService.instance.isOffline) {
+        await OfflineSyncService.instance.savePendingTaskLog(logPayload);
+        await AppConnectionService.instance.refreshPendingCount();
+      } else {
+        rethrow;
+      }
+    }
+  }
+
+  /// Sube un archivo binario al Storage de Supabase en el bucket `evidencias`.
+  /// Retorna la URL pública de la imagen o null si falla.
+  Future<String?> uploadEvidence({
+    required Uint8List bytes,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    try {
+      final client = SupabaseService.client;
+      final userId = client.auth.currentUser?.id ?? 'demo_user';
+      final planId = _cachedRoutePlanId ?? 'demo_plan';
+      final path = '$userId/$planId/$fileName';
+
+      await client.storage.from('evidencias').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mimeType),
+          );
+
+      final publicUrl = client.storage.from('evidencias').getPublicUrl(path);
+      return publicUrl;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[RouteRepository] Error subiendo evidencia a Supabase Storage: $e');
+      return null;
     }
   }
 

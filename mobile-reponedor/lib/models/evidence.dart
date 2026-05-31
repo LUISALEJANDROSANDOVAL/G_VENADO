@@ -3,7 +3,6 @@ import '../theme/app_colors.dart';
 import 'enums.dart';
 
 /// Evidencia fotográfica capturada en el PDV.
-/// TODO: Integrar con cámara y bucket de almacenamiento Supabase Storage.
 class Evidence {
   const Evidence({
     required this.id,
@@ -12,6 +11,8 @@ class Evidence {
     required this.type,
     this.mockColor = AppColors.steelBlue,
     this.taskId,
+    this.filePath,
+    this.publicUrl,
   });
 
   final String id;
@@ -20,8 +21,15 @@ class Evidence {
   final EvidenceType type;
   final Color mockColor;
   final String? taskId;
+  final String? filePath;
+  final String? publicUrl;
 
-  Evidence copyWith({EvidenceStatus? status, Color? mockColor}) {
+  Evidence copyWith({
+    EvidenceStatus? status,
+    Color? mockColor,
+    String? filePath,
+    String? publicUrl,
+  }) {
     return Evidence(
       id: id,
       label: label,
@@ -29,6 +37,8 @@ class Evidence {
       type: type,
       mockColor: mockColor ?? this.mockColor,
       taskId: taskId,
+      filePath: filePath ?? this.filePath,
+      publicUrl: publicUrl ?? this.publicUrl,
     );
   }
 }
