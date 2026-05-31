@@ -15,6 +15,7 @@ export interface PDV {
   lastVisit?: string
   visited: boolean
   availableDays: WeekDay[]
+  city?: string
 }
 
 export interface Reponedor {
@@ -30,6 +31,7 @@ export interface Reponedor {
   routeProgress: number
   delay: number
   activeOrders: number
+  city?: string
 }
 
 export interface KPIData {
@@ -81,15 +83,31 @@ export const generatePDVs = (count: number = 150): PDV[] => {
   const pdvs: PDV[] = []
   for (let i = 0; i < count; i++) {
     const types: ClientType[] = ['Pareto', 'Mayorista', 'Detallista']
+    
+    let city = 'Cochabamba'
+    let lat = -17.3895
+    let lng = -66.1568
+    
+    if (i % 3 === 1) {
+      city = 'Santa Cruz'
+      lat = -17.7862
+      lng = -63.1812
+    } else if (i % 3 === 2) {
+      city = 'La Paz'
+      lat = -16.5000
+      lng = -68.1500
+    }
+
     pdvs.push({
       id: `PDV-${String(i + 1).padStart(4, '0')}`,
       nombre: `${names[i % names.length]} ${Math.floor(i / names.length) + 1}`,
       type: types[Math.floor(Math.random() * types.length)],
-      lat: -34.6 + Math.random() * 0.5,
-      lng: -58.4 + Math.random() * 0.5,
+      lat: lat + (Math.random() - 0.5) * 0.08,
+      lng: lng + (Math.random() - 0.5) * 0.08,
       visited: Math.random() > 0.3,
       lastVisit: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 86400000).toISOString() : undefined,
-      availableDays: ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
+      availableDays: ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'],
+      city
     })
   }
   return pdvs
@@ -108,17 +126,33 @@ export const generateReponedores = (count: number = 12): Reponedor[] => {
   for (let i = 0; i < count; i++) {
     const status = statuses[Math.floor(Math.random() * statuses.length)]
     const mockId = `REP-${String(i + 1).padStart(3, '0')}`
+    const workerCity = ['Cochabamba', 'Santa Cruz', 'La Paz'][i % 3]
     
     const sequence: string[] = []
     const sequenceLength = 6 + (i % 3)
+    
+    const cityPdvsIndices: number[] = []
+    for (let pIdx = 0; pIdx < 150; pIdx++) {
+      if (pIdx % 3 === i % 3) {
+        cityPdvsIndices.push(pIdx + 1)
+      }
+    }
+
     for (let j = 0; j < sequenceLength; j++) {
-      const pdvIdx = ((i * 8 + j) % 150) + 1
+      const pdvIdx = cityPdvsIndices[(Math.floor(i / 3) * 8 + j) % cityPdvsIndices.length]
       sequence.push(`PDV-${String(pdvIdx).padStart(4, '0')}`)
     }
 
     const currentPdvId = sequence[Math.floor(Math.random() * sequence.length)]
-    const lat = -34.61 + (i * 0.02)
-    const lng = -58.44 + (i * 0.02)
+    
+    const cityCoords = {
+      'Cochabamba': { lat: -17.3895, lng: -66.1568 },
+      'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
+      'La Paz': { lat: -16.5000, lng: -68.1500 }
+    }
+    const coords = cityCoords[workerCity as keyof typeof cityCoords] || cityCoords['Santa Cruz']
+    const lat = coords.lat + (i * 0.005)
+    const lng = coords.lng + (i * 0.005)
 
     reponedores.push({
       id: mockId,
@@ -133,6 +167,7 @@ export const generateReponedores = (count: number = 12): Reponedor[] => {
       routeProgress: Math.random() * 100,
       delay: status === 'Retrasado' ? Math.floor(Math.random() * 90) + 15 : Math.random() * 15,
       activeOrders: Math.floor(Math.random() * 8) + 1,
+      city: workerCity
     })
   }
   return reponedores

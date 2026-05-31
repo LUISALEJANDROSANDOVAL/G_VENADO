@@ -107,13 +107,29 @@ export async function seedDatabase() {
     const pdvsToInsert = []
     for (let i = 0; i < 150; i++) {
       const category = categories[i % categories.length]
+      
+      // Bolivia cities and coordinates
+      let market = 'Cochabamba'
+      let lat = -17.3895
+      let lng = -66.1568
+      
+      if (i % 3 === 1) {
+        market = 'Santa Cruz'
+        lat = -17.7862
+        lng = -63.1812
+      } else if (i % 3 === 2) {
+        market = 'La Paz'
+        lat = -16.5000
+        lng = -68.1500
+      }
+
       pdvsToInsert.push({
         id: `PDV-${String(i + 1).padStart(4, '0')}`,
         name: `${pdvNames[i % pdvNames.length]} ${Math.floor(i / pdvNames.length) + 1}`,
-        market: i % 2 === 0 ? 'Buenos Aires' : 'Córdoba',
+        market: market,
         category: category,
-        latitude: -34.6 + (Math.random() - 0.5) * 0.4,
-        longitude: -58.4 + (Math.random() - 0.5) * 0.4,
+        latitude: lat + (Math.random() - 0.5) * 0.08,
+        longitude: lng + (Math.random() - 0.5) * 0.08,
         base_duration_minutes: 20 + (i % 5) * 10
       })
     }
@@ -129,12 +145,14 @@ export async function seedDatabase() {
     
     for (let i = 0; i < insertedWorkers.length; i++) {
       const worker = insertedWorkers[i]
+      const workerCity = ['Cochabamba', 'Santa Cruz', 'La Paz'][i % 3]
+      const cityPdvs = pdvsToInsert.filter(p => p.market === workerCity)
       
-      // Assign 8 random PDVs to this worker
+      // Assign 8 random PDVs to this worker from their city
       const workerPdvSequence = []
       for (let j = 0; j < 8; j++) {
-        const pdvIndex = (i * 8 + j) % 150
-        workerPdvSequence.push(`PDV-${String(pdvIndex + 1).padStart(4, '0')}`)
+        const pdvIndex = (Math.floor(i / 3) * 8 + j) % cityPdvs.length
+        workerPdvSequence.push(cityPdvs[pdvIndex].id)
       }
 
       // Random status
@@ -312,7 +330,8 @@ export async function getDashboardData() {
       lng: parseFloat(p.longitude as any),
       visited: visitedPdvIds.has(p.id),
       lastVisit: lastVisitMap[p.id] || undefined,
-      availableDays: getAvailableDays(p.category, p.id)
+      availableDays: getAvailableDays(p.category, p.id),
+      city: p.market
     }))
 
     // Map Reponedores
@@ -357,6 +376,21 @@ export async function getDashboardData() {
       const currentPdvId = sequence[Math.max(0, visitedCount - 1)]
       const currPdv = mappedPdvs.find(p => p.id === currentPdvId)
 
+      let workerCity = ['Cochabamba', 'Santa Cruz', 'La Paz'][idx % 3]
+      if (sequence.length > 0) {
+        const firstPdv = mappedPdvs.find(p => p.id === sequence[0])
+        if (firstPdv?.city) {
+          workerCity = firstPdv.city
+        }
+      }
+
+      const cityCoords = {
+        'Cochabamba': { lat: -17.3895, lng: -66.1568 },
+        'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
+        'La Paz': { lat: -16.5000, lng: -68.1500 }
+      }
+      const coords = cityCoords[workerCity as keyof typeof cityCoords] || cityCoords['Santa Cruz']
+
       return {
         id: user.id.substring(0, 8).toUpperCase(), // Short ID
         dbUuid: user.id, // Keep full UUID
@@ -365,11 +399,12 @@ export async function getDashboardData() {
         status,
         currentPDV: currentPdvId || undefined,
         sequence, // Keep full today's sequence
-        lat: currPdv?.lat || -34.61 + (idx * 0.02),
-        lng: currPdv?.lng || -58.44 + (idx * 0.02),
+        lat: currPdv?.lat || coords.lat + (idx * 0.005),
+        lng: currPdv?.lng || coords.lng + (idx * 0.005),
         routeProgress,
         delay,
-        activeOrders: Math.max(1, totalCount - visitedCount)
+        activeOrders: Math.max(1, totalCount - visitedCount),
+        city: workerCity
       }
     })
 
@@ -868,3 +903,218 @@ export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
     return { error: e.message || 'Error al reasignar punto de venta.' }
   }
 }
+
+export async function getTomorrowRoutesPlan() {
+  try {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+
+    // 1. Check if plans already exist for tomorrow
+    const { data: existingPlans, error: fetchErr } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .select('*')
+      .eq('date', tomorrowStr)
+
+    if (fetchErr) throw new Error(fetchErr.message)
+
+    const { data: users, error: usersErr } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('role', 'REPONEDOR')
+      .eq('is_active', true)
+
+    if (usersErr) throw new Error(usersErr.message)
+
+    if (existingPlans && existingPlans.length > 0) {
+      // Map existing plans to response format
+      const mapped = existingPlans.map(p => {
+        const user = users?.find(u => u.id === p.reponedor_id)
+        return {
+          reponedorId: p.reponedor_id,
+          reponedorName: user?.name || 'Reponedor',
+          sequence: p.optimized_pos_sequence,
+          published: true,
+          status: p.status
+        }
+      })
+      return { published: true, plans: mapped }
+    }
+
+    // 2. No plans exist, generate suggestions
+    const { data: pdvs, error: pdvsErr } = await supabaseAdmin
+      .from('points_of_sale')
+      .select('*')
+
+    if (pdvsErr) throw new Error(pdvsErr.message)
+
+    // Determine day of week for tomorrow
+    const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
+    const tomorrowDay = days[tomorrow.getDay()] // e.g. "LUN"
+
+    // Filter PDVs available tomorrow
+    const getAvailableDays = (category: string, pdvId: string): string[] => {
+      const numericSuffix = parseInt(pdvId.replace(/\D/g, '') || '0', 10)
+      switch (category) {
+        case 'PARETO':
+          return ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE']
+        case 'MAYORISTA':
+          return numericSuffix % 2 === 0
+            ? ['LUN', 'MIÉ', 'VIE']
+            : ['MAR', 'JUE', 'SÁB']
+        case 'MINORISTA':
+          return numericSuffix % 3 === 0
+            ? ['LUN', 'JUE']
+            : numericSuffix % 3 === 1
+            ? ['MAR', 'VIE']
+            : ['MIÉ', 'SÁB']
+        case 'DETALLISTA':
+        default:
+          return numericSuffix % 2 === 0 ? ['LUN', 'MIÉ'] : ['MAR', 'VIE']
+      }
+    }
+
+    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(tomorrowDay))
+    const pdvPool = availablePdvs.length > 0 ? availablePdvs : pdvs
+
+    // Greedy nearest-neighbor TSP sequence generator
+    function optimizeSequence(pdvsList: any[]) {
+      if (pdvsList.length <= 1) return pdvsList.map(p => p.id)
+      
+      const optimized: string[] = []
+      let current = pdvsList[0]
+      optimized.push(current.id)
+      
+      const unvisited = pdvsList.slice(1)
+      while (unvisited.length > 0) {
+        let bestIdx = 0
+        let bestDist = Infinity
+        for (let i = 0; i < unvisited.length; i++) {
+          const candidate = unvisited[i]
+          const dist = Math.pow(parseFloat(current.latitude) - parseFloat(candidate.latitude), 2) + 
+                       Math.pow(parseFloat(current.longitude) - parseFloat(candidate.longitude), 2)
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        }
+        current = unvisited[bestIdx]
+        optimized.push(current.id)
+        unvisited.splice(bestIdx, 1)
+      }
+      return optimized
+    }
+
+    // Geographical K-Means Clustering to partition PDVs among workers (organize where each worker goes)
+    const numWorkers = users.length
+    if (numWorkers === 0) return { published: false, plans: [] }
+
+    // Initialize centroids by choosing well-spaced out PDVs from the pool
+    const centroids = []
+    for (let i = 0; i < numWorkers; i++) {
+      const idx = Math.min(pdvPool.length - 1, Math.floor((i * pdvPool.length) / numWorkers))
+      centroids.push({
+        lat: parseFloat(pdvPool[idx].latitude),
+        lng: parseFloat(pdvPool[idx].longitude)
+      })
+    }
+
+    // Run K-Means for 5 iterations to group close-by points of sale
+    const assignments: Record<string, number> = {}
+    for (let iter = 0; iter < 5; iter++) {
+      // 1. Assign each PDV to the nearest centroid
+      pdvPool.forEach(pdv => {
+        const pdvLat = parseFloat(pdv.latitude)
+        const pdvLng = parseFloat(pdv.longitude)
+        let bestIdx = 0
+        let bestDist = Infinity
+        for (let i = 0; i < numWorkers; i++) {
+          const dist = Math.pow(pdvLat - centroids[i].lat, 2) + Math.pow(pdvLng - centroids[i].lng, 2)
+          if (dist < bestDist) {
+            bestDist = dist
+            bestIdx = i
+          }
+        }
+        assignments[pdv.id] = bestIdx
+      })
+
+      // 2. Recalculate centroids
+      const newCentroids = Array.from({ length: numWorkers }, () => ({ lat: 0, lng: 0, count: 0 }))
+      pdvPool.forEach(pdv => {
+        const clusterIdx = assignments[pdv.id]
+        newCentroids[clusterIdx].lat += parseFloat(pdv.latitude)
+        newCentroids[clusterIdx].lng += parseFloat(pdv.longitude)
+        newCentroids[clusterIdx].count += 1
+      })
+
+      for (let i = 0; i < numWorkers; i++) {
+        if (newCentroids[i].count > 0) {
+          centroids[i] = {
+            lat: newCentroids[i].lat / newCentroids[i].count,
+            lng: newCentroids[i].lng / newCentroids[i].count
+          }
+        }
+      }
+    }
+
+    // Allocate clusters to workers and optimize their route sequence
+    const suggestedPlans = (users || []).map((user, idx) => {
+      // Get all PDVs in this geographical cluster
+      const clusterPdvs = pdvPool.filter(pdv => assignments[pdv.id] === idx)
+      
+      // Sort cluster PDVs by proximity to the cluster's centroid
+      const center = centroids[idx]
+      clusterPdvs.sort((a, b) => {
+        const distA = Math.pow(parseFloat(a.latitude) - center.lat, 2) + Math.pow(parseFloat(a.longitude) - center.lng, 2)
+        const distB = Math.pow(parseFloat(b.latitude) - center.lat, 2) + Math.pow(parseFloat(b.longitude) - center.lng, 2)
+        return distA - distB
+      })
+
+      // Limit to 7-8 points to avoid worker overload
+      const maxPdvs = 7 + (idx % 2)
+      const selectedPdvs = clusterPdvs.slice(0, maxPdvs)
+      
+      // Run TSP Nearest Neighbor on this localized cluster
+      const optimizedSeq = optimizeSequence(selectedPdvs)
+      return {
+        reponedorId: user.id,
+        reponedorName: user.name,
+        sequence: optimizedSeq,
+        published: false,
+        status: 'ASIGNADA'
+      }
+    })
+
+    return { published: false, plans: suggestedPlans }
+  } catch (e: any) {
+    console.error('Failed to get tomorrow routes plan:', e)
+    return { error: e.message || 'Error al obtener planificación.' }
+  }
+}
+
+export async function publishTomorrowRoutesPlan(plans: any[]) {
+  try {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+
+    const rowsToInsert = plans.map(p => ({
+      reponedor_id: p.reponedorId,
+      date: tomorrowStr,
+      optimized_pos_sequence: p.sequence,
+      status: 'ASIGNADA'
+    }))
+
+    const { error } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .upsert(rowsToInsert, { onConflict: 'reponedor_id,date' })
+
+    if (error) throw new Error(error.message)
+
+    return { success: true }
+  } catch (e: any) {
+    console.error('Failed to publish tomorrow routes plan:', e)
+    return { error: e.message || 'Error al publicar planificación.' }
+  }
+}
+
