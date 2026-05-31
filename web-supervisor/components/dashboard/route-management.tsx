@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   AlertTriangle, Zap, Check, Loader2, History, ChevronDown, ChevronRight,
   Camera, Clock, User, Store, MapPin, X, ArrowRight, Route, SlidersHorizontal,
-  Calendar
+  Calendar, Send
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -316,121 +316,157 @@ function RouteHistoryRow({
         )}
       </div>
 
-      {/* Expanded: route sequence + evidence cards */}
+      {/* Expanded: per-stop evidence timeline */}
       {expanded && (
-        <div className="border-t border-border bg-muted/10 px-5 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Left Column: Route Sequence */}
-            <div className="lg:col-span-1 border-r border-border/40 pr-6 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
-                <Store className="h-3.5 w-3.5 text-primary" />
-                Secuencia de Visitas ({entry.completedCount}/{entry.pdvCount})
-              </p>
-              
-              <div className="relative pl-4 border-l border-border ml-2 space-y-4">
-                {entry.sequence.map((pdvId, idx) => {
-                  const pdv = pdvs.find(p => p.id === pdvId)
-                  const isCompleted = idx < entry.completedCount
-                  const isNext = !isCompleted && idx === entry.completedCount
-                  
-                  if (!pdv) return null
-                  
-                  return (
-                    <div key={pdvId} className="relative flex items-start gap-2.5">
-                      {/* Timeline dot */}
+        <div className="border-t border-border bg-muted/10 px-5 py-5">
+
+          {/* Summary header */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Store className="h-3.5 w-3.5 text-primary" />
+              Secuencia de visitas con evidencias — {entry.completedCount}/{entry.pdvCount} completadas
+            </p>
+            {entry.evidences.length > 0 && (
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <Camera className="h-3 w-3" />
+                {entry.evidences.length} evidencias totales
+              </span>
+            )}
+          </div>
+
+          {entry.sequence.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground flex flex-col items-center gap-2">
+              <Camera className="h-8 w-8 text-muted-foreground/30" />
+              <p className="text-sm">Sin secuencia de visitas registrada.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {entry.sequence.map((pdvId, idx) => {
+                const pdv = pdvs.find(p => p.id === pdvId)
+                const isCompleted = idx < entry.completedCount
+                const isNext = !isCompleted && idx === entry.completedCount
+
+                // Match evidences for this PDV by name or id
+                const pdvEvidences = entry.evidences.filter(
+                  ev => ev.pdvName === (pdv?.nombre || pdv?.name) || (ev as any).pdvId === pdvId
+                )
+
+                return (
+                  <div
+                    key={pdvId}
+                    className={[
+                      "rounded-xl border overflow-hidden transition-all duration-200",
+                      isCompleted
+                        ? "border-emerald-500/25 bg-card"
+                        : isNext
+                        ? "border-primary/30 bg-card"
+                        : "border-border/60 bg-muted/20"
+                    ].join(" ")}
+                  >
+                    {/* ── Stop header ── */}
+                    <div className={[
+                      "flex items-center gap-3 px-4 py-3",
+                      isCompleted ? "bg-emerald-500/5" : isNext ? "bg-primary/5" : "bg-transparent"
+                    ].join(" ")}>
+
+                      {/* Stop number bubble */}
                       <div className={[
-                        "absolute -left-[22px] w-2.5 h-2.5 rounded-full border-2 bg-card",
-                        isCompleted 
-                          ? "border-emerald-500 bg-emerald-500" 
-                          : isNext 
-                          ? "border-primary bg-primary animate-pulse" 
-                          : "border-muted-foreground/45 bg-muted"
-                      ].join(" ")} />
-                      
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-xs font-semibold truncate ${isCompleted ? 'text-foreground/80 line-through decoration-emerald-500/50' : 'text-foreground'}`}>
-                            {idx + 1}. {pdv.nombre || pdv.name}
-                          </span>
-                          <span className="text-[9px] font-mono px-1 rounded bg-muted border border-border text-muted-foreground">
+                        "w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-extrabold border",
+                        isCompleted
+                          ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400"
+                          : isNext
+                          ? "bg-primary/15 border-primary/30 text-primary"
+                          : "bg-muted/60 border-border text-muted-foreground"
+                      ].join(" ")}>
+                        {idx + 1}
+                      </div>
+
+                      {/* PDV name + type */}
+                      <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                        <span className={`text-sm font-semibold truncate ${isCompleted ? 'text-foreground' : 'text-foreground/70'}`}>
+                          {pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`}
+                        </span>
+                        {pdv && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-muted-foreground shrink-0">
                             {pdv.type}
                           </span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          {isCompleted 
-                            ? "✓ Completado" 
-                            : isNext 
-                            ? "⏳ Próxima parada" 
-                            : "💤 Pendiente"}
-                        </p>
+                        )}
+                        {pdvEvidences.length > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground shrink-0">
+                            <Camera className="h-2.5 w-2.5" />
+                            {pdvEvidences.length} evidencia{pdvEvidences.length > 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
+
+                      {/* Status pill */}
+                      <span className={[
+                        "shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full border",
+                        isCompleted
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : isNext
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted/40 text-muted-foreground border-border"
+                      ].join(" ")}>
+                        {isCompleted ? "✓ Completado" : isNext ? "⏳ Próxima" : "💤 Pendiente"}
+                      </span>
                     </div>
-                  )
-                })}
-                {entry.sequence.length === 0 && (
-                  <p className="text-xs text-muted-foreground italic pl-2">Sin secuencia de visitas registrada.</p>
-                )}
-              </div>
-            </div>
 
-            {/* Right Column: Evidence cards */}
-            <div className="lg:col-span-2 space-y-3">
-              {entry.evidences.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-sm flex flex-col items-center justify-center h-full gap-2">
-                  <Camera className="h-8 w-8 text-muted-foreground/30" />
-                  <p>No hay evidencias fotográficas registradas para esta jornada.</p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
-                    <Camera className="h-3.5 w-3.5 text-primary" />
-                    Evidencias de auditoría
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {entry.evidences.map((ev) => (
-                      <div key={ev.id} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-                        {/* Card header */}
-                        <div className="px-3 pt-3 pb-2">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <Store className="h-3 w-3 text-primary shrink-0" />
-                            <p className="text-xs font-semibold text-foreground truncate">{ev.pdvName}</p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <Badge
-                              variant="outline"
-                              className={`text-[9px] font-bold border ${TASK_COLORS[ev.taskName] ?? 'bg-muted/50 text-muted-foreground border-border'}`}
-                            >
-                              {ev.taskName}
-                            </Badge>
-                            <span className="text-[9px] text-muted-foreground">
-                              {new Date(ev.timestamp).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
+                    {/* ── Evidence body ── */}
+                    <div className="px-4 pb-4 pt-3 border-t border-border/40">
+                      {pdvEvidences.length === 0 ? (
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground/55 italic">
+                          <Camera className="h-3.5 w-3.5 shrink-0" />
+                          {isCompleted
+                            ? "Visita completada sin evidencias fotográficas registradas."
+                            : "Sin evidencias — visita aún no realizada."}
                         </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {pdvEvidences.map((ev, evIdx) => (
+                            <div key={ev.id} className={evIdx > 0 ? "border-t border-border/30 pt-4" : ""}>
+                              {/* Task label + timestamp */}
+                              <div className="flex items-center justify-between gap-2 mb-2.5">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[9px] font-bold border ${TASK_COLORS[ev.taskName] ?? 'bg-muted/50 text-muted-foreground border-border'}`}
+                                >
+                                  {ev.taskName}
+                                </Badge>
+                                <span className="text-[9px] text-muted-foreground font-medium">
+                                  🕐 {new Date(ev.timestamp).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
 
-                        {/* Antes / Después */}
-                        <div className="px-3 pb-3 flex gap-2">
-                          <PhotoPanel label="Antes" url={ev.beforeUrl} taskName={ev.taskName} onZoom={onZoom} />
-                          <div className="flex items-center shrink-0">
-                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                          <PhotoPanel label="Después" url={ev.afterUrl} taskName={ev.taskName} onZoom={onZoom} />
-                        </div>
+                              {/* Before / After photos */}
+                              <div className="flex gap-2.5 items-stretch">
+                                <PhotoPanel label="Antes" url={ev.beforeUrl} taskName={ev.taskName} onZoom={onZoom} />
+                                <div className="flex items-center shrink-0 self-center">
+                                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                                </div>
+                                <PhotoPanel label="Después" url={ev.afterUrl} taskName={ev.taskName} onZoom={onZoom} />
+                              </div>
 
-                        {/* Completion pill */}
-                        <div className={`mx-3 mb-3 flex items-center gap-1 text-[10px] font-medium rounded px-2 py-1
-                          ${ev.afterUrl ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                          {ev.afterUrl ? '✓ Ciclo completo' : '⏳ Cierre pendiente'}
+                              {/* Completion pill */}
+                              <div className={[
+                                "mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold rounded-lg px-3 py-1.5 border w-fit",
+                                ev.afterUrl
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              ].join(" ")}>
+                                {ev.afterUrl ? '✓ Ciclo completo' : '⏳ Esperando foto de salida desde Flutter'}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
-                </>
-              )}
+                )
+              })}
             </div>
+          )}
 
-          </div>
         </div>
       )}
     </div>
@@ -438,6 +474,7 @@ function RouteHistoryRow({
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+
 export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs = [], onRefresh, onViewOnMap }: RouteManagementProps) {
   const { toast } = useToast()
   const [isOptimizing, setIsOptimizing] = useState(false)
@@ -504,6 +541,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
   // Tomorrow cards expand/collapse state
   const [expandedTomorrowCards, setExpandedTomorrowCards] = useState<Record<string, boolean>>({})
+
+  // Per-worker assignment state
+  const [assignedWorkers, setAssignedWorkers] = useState<Record<string, boolean>>({})
+  const [isAssigningWorker, setIsAssigningWorker] = useState<string | null>(null)
 
   // Tomorrow stops drag & drop reorder states
   const [draggingIndex, setDraggingIndex] = useState<{ workerId: string; index: number } | null>(null)
@@ -579,6 +620,41 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       ...prev,
       [reponedorId]: !prev[reponedorId]
     }))
+  }
+
+  // Assign route for a single worker
+  const handleAssignWorkerRoute = async (reponedorId: string, reponedorName: string) => {
+    if (!tomorrowPlans) return
+    const workerPlan = tomorrowPlans.find(p => p.reponedorId === reponedorId)
+    if (!workerPlan) return
+
+    setIsAssigningWorker(reponedorId)
+    try {
+      // Publish only this worker's plan (send all plans to keep consistency in backend)
+      const res = await publishTomorrowRoutesPlan(tomorrowPlans)
+      if ('error' in res && res.error) {
+        toast({
+          title: `Error al asignar ruta a ${reponedorName}`,
+          description: res.error,
+          variant: 'destructive',
+        })
+      } else {
+        setAssignedWorkers(prev => ({ ...prev, [reponedorId]: true }))
+        toast({
+          title: `✓ Ruta asignada — ${reponedorName}`,
+          description: `${workerPlan.sequence.length} paradas confirmadas y enviadas al dispositivo del reponedor.`,
+        })
+        if (onRefresh) onRefresh()
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error de conexión',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsAssigningWorker(null)
+    }
   }
 
   const getFormattedHistoryDate = (dateStr: string) => {
@@ -1481,15 +1557,41 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {tomorrowPublished ? (
+                            {/* Status badge */}
+                            {(tomorrowPublished || assignedWorkers[p.reponedorId]) ? (
                               <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                ✓ Publicada
+                                ✓ Asignada
                               </span>
                             ) : (
                               <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
                                 Sugerida
                               </span>
                             )}
+
+                            {/* Per-worker Assign Route Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAssignWorkerRoute(p.reponedorId, p.reponedorName)
+                              }}
+                              disabled={isAssigningWorker === p.reponedorId || (tomorrowPublished && assignedWorkers[p.reponedorId]) || plannedCount === 0}
+                              className={[
+                                "flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all duration-200 shrink-0 cursor-pointer",
+                                (tomorrowPublished || assignedWorkers[p.reponedorId])
+                                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400 cursor-default"
+                                  : plannedCount === 0
+                                  ? "bg-muted/30 border-border text-muted-foreground cursor-not-allowed opacity-50"
+                                  : "bg-primary/10 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-sm active:scale-95"
+                              ].join(" ")}
+                            >
+                              {isAssigningWorker === p.reponedorId ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Asignando...</>
+                              ) : (tomorrowPublished || assignedWorkers[p.reponedorId]) ? (
+                                <><Check className="h-3 w-3" /> Asignada</>
+                              ) : (
+                                <><Send className="h-3 w-3" /> Asignar Ruta</>
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>
