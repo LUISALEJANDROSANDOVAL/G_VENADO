@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://myoorvexgxgdrpllbtru.supabase.co'
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key'
 
 // Create an admin client that bypasses RLS policies
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
