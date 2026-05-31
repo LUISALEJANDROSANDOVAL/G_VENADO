@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
-import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan } from '@/app/actions'
+import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan, addPdvToRoute, removePdvFromRoute } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -502,6 +502,85 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   // Date state for history audit
   const [selectedHistoryDate, setSelectedHistoryDate] = useState('2026-05-31')
 
+  // Tomorrow cards expand/collapse state
+  const [expandedTomorrowCards, setExpandedTomorrowCards] = useState<Record<string, boolean>>({})
+
+  // Tomorrow stops drag & drop reorder states
+  const [draggingIndex, setDraggingIndex] = useState<{ workerId: string; index: number } | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<{ workerId: string; index: number } | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, workerId: string, index: number) => {
+    setDraggingIndex({ workerId, index })
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent, workerId: string, index: number) => {
+    e.preventDefault()
+    if (draggingIndex && draggingIndex.workerId === workerId) {
+      setDragOverIndex({ workerId, index })
+    }
+  }
+
+  const handleDrop = async (e: React.DragEvent, workerId: string, targetIndex: number) => {
+    e.preventDefault()
+    if (!draggingIndex || draggingIndex.workerId !== workerId) return
+    
+    const sourceIndex = draggingIndex.index
+    if (sourceIndex === targetIndex) {
+      setDraggingIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+
+    const plan = tomorrowPlans?.find(p => p.reponedorId === workerId)
+    if (!plan) return
+
+    const newSequence = [...plan.sequence]
+    const [movedItem] = newSequence.splice(sourceIndex, 1)
+    newSequence.splice(targetIndex, 0, movedItem)
+
+    // Update state locally
+    setTomorrowPlans(prev => prev ? prev.map(p => {
+      if (p.reponedorId === workerId) {
+        return { ...p, sequence: newSequence }
+      }
+      return p
+    }) : null)
+
+    setDraggingIndex(null)
+    setDragOverIndex(null)
+
+    // Save automatically if published
+    if (tomorrowPublished && tomorrowPlans) {
+      setIsReassigning(true)
+      try {
+        const updatedPlans = tomorrowPlans.map(p => {
+          if (p.reponedorId === workerId) {
+            return { ...p, sequence: newSequence }
+          }
+          return p
+        })
+        const res = await publishTomorrowRoutesPlan(updatedPlans)
+        if ('error' in res && res.error) {
+          alert('Error al reordenar: ' + res.error)
+        } else {
+          if (onRefresh) onRefresh()
+        }
+      } catch (err: any) {
+        alert('Error al guardar reordenamiento: ' + err.message)
+      } finally {
+        setIsReassigning(false)
+      }
+    }
+  }
+
+  const toggleTomorrowCard = (reponedorId: string) => {
+    setExpandedTomorrowCards(prev => ({
+      ...prev,
+      [reponedorId]: !prev[reponedorId]
+    }))
+  }
+
   const getFormattedHistoryDate = (dateStr: string) => {
     const parts = dateStr.split('-')
     if (parts.length !== 3) return ''
@@ -565,6 +644,118 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
     } finally {
       setIsReassigning(false)
     }
+  }
+
+  const handleReassignTomorrow = async (pdvId: string, targetReponedorId: string) => {
+    let currentReponedorId = ''
+    tomorrowPlans.forEach(p => {
+      if (p.sequence.includes(pdvId)) {
+        currentReponedorId = p.reponedorId
+      }
+    })
+
+    if (tomorrowPublished) {
+      setIsReassigning(true)
+      try {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = tomorrow.toISOString().split('T')[0]
+        
+        const res = await reassignPdv(pdvId, targetReponedorId, tomorrowStr)
+        if ('error' in res && res.error) {
+          alert('Error al reasignar: ' + res.error)
+        } else {
+          if (onRefresh) onRefresh()
+        }
+      } catch (e: any) {
+        alert('Error: ' + e.message)
+      } finally {
+        setIsReassigning(false)
+      }
+    } else {
+      setTomorrowPlans(prev => prev.map(p => {
+        let seq = p.sequence
+        if (p.reponedorId === currentReponedorId) {
+          seq = seq.filter((id: string) => id !== pdvId)
+        }
+        if (p.reponedorId === targetReponedorId) {
+          if (!seq.includes(pdvId)) {
+            seq = [...seq, pdvId]
+          }
+        }
+        return { ...p, sequence: seq }
+      }))
+    }
+  }
+
+  const handleRemoveTomorrow = async (pdvId: string, reponedorId: string) => {
+    if (tomorrowPublished) {
+      setIsReassigning(true)
+      try {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = tomorrow.toISOString().split('T')[0]
+        const res = await removePdvFromRoute(pdvId, reponedorId, tomorrowStr)
+        if ('error' in res && res.error) {
+          alert('Error: ' + res.error)
+        } else {
+          if (onRefresh) onRefresh()
+        }
+      } catch (e: any) {
+        alert('Error: ' + e.message)
+      } finally {
+        setIsReassigning(false)
+      }
+    } else {
+      setTomorrowPlans(prev => prev.map(p => {
+        if (p.reponedorId === reponedorId) {
+          return { ...p, sequence: p.sequence.filter((id: string) => id !== pdvId) }
+        }
+        return p
+      }))
+    }
+  }
+
+  const handleAddTomorrow = async (pdvId: string, reponedorId: string) => {
+    if (tomorrowPublished) {
+      setIsReassigning(true)
+      try {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = tomorrow.toISOString().split('T')[0]
+        const res = await addPdvToRoute(pdvId, reponedorId, tomorrowStr)
+        if ('error' in res && res.error) {
+          alert('Error: ' + res.error)
+        } else {
+          if (onRefresh) onRefresh()
+        }
+      } catch (e: any) {
+        alert('Error: ' + e.message)
+      } finally {
+        setIsReassigning(false)
+      }
+    } else {
+      setTomorrowPlans(prev => prev.map(p => {
+        if (p.reponedorId === reponedorId) {
+          if (!p.sequence.includes(pdvId)) {
+            return { ...p, sequence: [...p.sequence, pdvId] }
+          }
+        }
+        return p
+      }))
+    }
+  }
+
+  const getUnassignedPdvsTomorrow = (workerCity: string) => {
+    const assignedIds = new Set((tomorrowPlans || []).flatMap(p => p.sequence || []))
+    let filtered = pdvs.filter(p => {
+      const pCity = p.city || p.market || p.mercado
+      return pCity === workerCity && !assignedIds.has(p.id)
+    })
+    if (filtered.length === 0) {
+      filtered = pdvs.filter(p => !assignedIds.has(p.id))
+    }
+    return filtered
   }
 
   const handleApproveAdjustment = async (pdvId: string, suggestedBase: number) => {
@@ -1186,6 +1377,37 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                 </div>
               )}
 
+              {/* Expand/Collapse All Buttons */}
+              <div className="flex justify-end gap-2 mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
+                  onClick={() => {
+                    const allExpanded: Record<string, boolean> = {}
+                    if (tomorrowPlans) {
+                      tomorrowPlans.forEach(p => {
+                        allExpanded[p.reponedorId] = true
+                      })
+                    }
+                    setExpandedTomorrowCards(allExpanded)
+                  }}
+                >
+                  Expandir todo
+                </Button>
+                <span className="text-muted-foreground/30 self-center text-xs">|</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground hover:text-foreground h-7 px-2.5 cursor-pointer"
+                  onClick={() => {
+                    setExpandedTomorrowCards({})
+                  }}
+                >
+                  Colapsar todo
+                </Button>
+              </div>
+
               {/* Suggested routes list */}
               <div className="grid grid-cols-1 gap-4">
                 {(tomorrowPlans || []).map((p, idx) => {
@@ -1200,18 +1422,37 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   // Find reponedor route from active list
                   const workerObj = reponedores?.find(w => w.dbUuid === p.reponedorId || w.id === p.reponedorId)
                   const routeName = workerObj?.route || 'Urbana'
+                  const workerCity = workerObj?.city || 'Santa Cruz'
                   
                   // Optimization details
                   const optDetail = nameLength % 2 === 0
                     ? "Calibrado de tiempos de servicio: Se ajustó el tiempo estimado de atención en base al promedio de visitas de hoy."
                     : "Optimización de recorrido TSP: Secuencia reordenada para minimizar la distancia total y tiempos de traslado."
 
+                  const isExpanded = !!expandedTomorrowCards[p.reponedorId]
+
                   return (
-                    <div key={p.reponedorId} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-                      {/* Card Header */}
-                      <div className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/10">
+                    <div key={p.reponedorId} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-all duration-200">
+                      {/* Clickable Card Header */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleTomorrowCard(p.reponedorId)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            toggleTomorrowCard(p.reponedorId)
+                          }
+                        }}
+                        className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer select-none outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          {/* Chevron icon */}
+                          <div className="text-muted-foreground shrink-0">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </div>
+
+                          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                             <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
@@ -1220,82 +1461,141 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                               <span className="text-[10px] text-muted-foreground">Ruta sugerida</span>
                               <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
                               <span className="text-[10px] text-muted-foreground font-medium">{routeName}</span>
+                              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                              <Badge variant="outline" className="px-1.5 py-0 text-[9px] bg-muted/50 text-muted-foreground border-border uppercase font-bold shrink-0">
+                                {workerCity}
+                              </Badge>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {tomorrowPublished ? (
-                            <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                              ✓ Publicada
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
-                              Sugerida
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        {/* Collapsed Stats Summary + Status Badges */}
+                        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+                          {/* Quick Stats (always visible for comparison, clean look) */}
+                          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground mr-1">
+                            <span className="font-semibold text-foreground">{plannedCount} PDVs</span>
+                            <span>•</span>
+                            <span>{estHours} hrs</span>
+                            <span>•</span>
+                            <span className="text-emerald-400 font-bold">+{estEff}%</span>
+                          </div>
 
-                      {/* Card Content */}
-                      <div className="px-5 py-4 space-y-4">
-                        {/* Metrics grid */}
-                        <div className="grid grid-cols-3 gap-4 border-b border-border/50 pb-4">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">PDVs Planificados</span>
-                            <p className="text-base font-bold text-foreground">{plannedCount} PDVs</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">Tiempo Estimado</span>
-                            <p className="text-base font-bold text-foreground">{estHours} hrs</p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">Eficiencia Estimada</span>
-                            <p className="text-base font-bold text-emerald-400">+{estEff}% <span className="text-[10px] font-medium text-emerald-500/80">distancia</span></p>
-                          </div>
-                        </div>
-
-                        {/* Horizontal Stop Sequence */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                            <Store className="h-3.5 w-3.5 text-primary" />
-                            Secuencia Planificada de Paradas (Optimización TSP)
-                          </h4>
-                          
-                          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
-                            {p.sequence.map((pdvId: string, idx: number) => {
-                              const pdv = pdvs.find(pos => pos.id === pdvId)
-                              const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
-                              const isLast = idx === p.sequence.length - 1
-                              return (
-                                <div key={pdvId} className="flex items-center gap-2 shrink-0">
-                                  <div className="flex flex-col items-center p-2.5 bg-muted/20 border border-border rounded-lg min-w-[130px] max-w-[150px] shadow-sm">
-                                    <span className="text-[9px] font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                                      Parada {idx + 1}
-                                    </span>
-                                    <span className="text-xs font-semibold text-foreground truncate w-full text-center mt-1.5" title={name}>
-                                      {name}
-                                    </span>
-                                    <span className="text-[9px] text-muted-foreground mt-0.5">{pdv?.type || 'Detallista'}</span>
-                                  </div>
-                                  {!isLast && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0" />}
-                                </div>
-                              )
-                            })}
-                            {p.sequence.length === 0 && (
-                              <p className="text-xs text-muted-foreground italic">Sin secuencia generada.</p>
+                          <div className="flex items-center gap-2">
+                            {tomorrowPublished ? (
+                              <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                ✓ Publicada
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                                Sugerida
+                              </span>
                             )}
                           </div>
                         </div>
+                      </div>
 
-                        {/* Feedback Loop Explanation */}
-                        <div className="text-[10px] font-medium bg-primary/5 border border-primary/15 rounded-lg px-3 py-2 text-foreground/80 flex items-start gap-2">
-                          <Zap className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                          <div>
-                            <strong className="text-primary">Optimización del Feedback Loop:</strong> {optDetail}
+                      {/* Card Content (Visible only when expanded) */}
+                      {isExpanded && (
+                        <div className="px-5 py-4 space-y-4 animate-in fade-in duration-200">
+                          {/* Horizontal Stop Sequence */}
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                              <Store className="h-3.5 w-3.5 text-primary" />
+                              Secuencia Planificada de Paradas (Optimización TSP)
+                            </h4>
+                            
+                            <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
+                              {p.sequence.map((pdvId: string, idx: number) => {
+                                const pdv = pdvs.find(pos => pos.id === pdvId)
+                                const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
+                                const isLast = idx === p.sequence.length - 1
+                                const isDragging = draggingIndex?.workerId === p.reponedorId && draggingIndex?.index === idx
+                                const isOver = dragOverIndex?.workerId === p.reponedorId && dragOverIndex?.index === idx
+
+                                return (
+                                  <div 
+                                    key={pdvId} 
+                                    className="flex items-center gap-2 shrink-0"
+                                    draggable="true"
+                                    onDragStart={(e) => handleDragStart(e, p.reponedorId, idx)}
+                                    onDragOver={(e) => handleDragOver(e, p.reponedorId, idx)}
+                                    onDrop={(e) => handleDrop(e, p.reponedorId, idx)}
+                                    onDragEnd={() => {
+                                      setDraggingIndex(null)
+                                      setDragOverIndex(null)
+                                    }}
+                                  >
+                                    <div className={[
+                                      "relative flex flex-col items-center p-3.5 rounded-xl min-w-[140px] max-w-[160px] shadow-xs group transition-all duration-200 cursor-grab active:cursor-grabbing select-none border",
+                                      isDragging 
+                                        ? "opacity-40 border-dashed border-muted-foreground bg-muted" 
+                                        : isOver
+                                        ? "border-primary border-dashed bg-primary/5 scale-105 shadow-md"
+                                        : "bg-gradient-to-b from-card to-muted/20 border-border/80 hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-sm"
+                                    ].join(" ")}>
+                                      {/* Delete Button */}
+                                      <button
+                                        onClick={() => handleRemoveTomorrow(pdvId, p.reponedorId)}
+                                        className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer z-10"
+                                        title="Quitar parada"
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+
+                                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                                        Parada {idx + 1}
+                                      </span>
+                                      <span className="text-xs font-bold text-foreground truncate w-full text-center mt-2 group-hover:text-primary transition-colors" title={name}>
+                                        {name}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground font-medium mt-0.5">{pdv?.type || 'Detallista'}</span>
+                                    </div>
+                                    {!isLast && <ArrowRight className="h-4 w-4 text-muted-foreground/45 shrink-0 mx-0.5 hover:translate-x-0.5 transition-transform" />}
+                                  </div>
+                                )
+                              })}
+                              {p.sequence.length === 0 && (
+                                <p className="text-xs text-muted-foreground italic">Sin secuencia generada.</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Route Customization Options */}
+                          <div className="border-t border-border/50 pt-3">
+                            {/* Add PDV */}
+                            <div className="flex items-center gap-3 bg-muted/10 p-2.5 rounded-xl border border-border max-w-md">
+                              <span className="text-[11px] uppercase font-bold text-muted-foreground shrink-0">Añadir parada:</span>
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleAddTomorrow(e.target.value, p.reponedorId)
+                                    e.target.value = ''
+                                  }
+                                }}
+                                className="bg-card border border-border text-foreground text-xs rounded-lg px-3 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-0 font-medium"
+                              >
+                                <option value="">— Seleccionar punto disponible —</option>
+                                {getUnassignedPdvsTomorrow(workerCity).map(pdv => {
+                                  const pCity = pdv.city || pdv.market || pdv.mercado || 'Sin ciudad'
+                                  return (
+                                    <option key={pdv.id} value={pdv.id}>
+                                      📍 {pdv.nombre || pdv.name} ({pdv.type} - {pCity})
+                                    </option>
+                                  )
+                                })}
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Feedback Loop Explanation */}
+                          <div className="text-[10px] font-medium bg-primary/5 border border-primary/15 rounded-lg px-3 py-2 text-foreground/80 flex items-start gap-2">
+                            <Zap className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="text-primary">Optimización del Feedback Loop:</strong> {optDetail}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )
                 })}

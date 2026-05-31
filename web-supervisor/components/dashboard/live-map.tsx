@@ -440,7 +440,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
               <select
                 value={selectedCity}
                 onChange={(e) => handleCityChange(e.target.value)}
-                className="bg-muted border border-border text-foreground text-[10px] sm:text-xs font-semibold rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:bg-muted/80 transition-colors"
+                className="bg-card hover:bg-muted/30 border border-border/80 text-foreground text-xs font-bold rounded-lg px-3 py-1 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/25 cursor-pointer transition-all duration-200"
               >
                 {sortedCities.map((city) => (
                   <option key={city} value={city} className="bg-card text-foreground font-semibold">
