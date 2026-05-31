@@ -4,40 +4,56 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Professional light theme - Control Tower */
-  --background: 240 10% 98%;
-  --foreground: 222 13% 13%;
+  /* Fondo general gris claro (#F8FAFC) */
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+
+  /* Tarjetas blancas (#FFFFFF) con bordes limpios */
   --card: 0 0% 100%;
-  --card-foreground: 222 13% 13%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 13% 13%;
-  --primary: 217 33% 17%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Azul Corporativo (#00457C) como color primario principal */
+  --primary: 207 100% 24%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 45 93% 56%;
-  --secondary-foreground: 222 13% 13%;
-  --muted: 220 13% 91%;
-  --muted-foreground: 215 14% 34%;
-  --accent: 142 72% 29%;
+
+  /* Gris neutro para deseleccionados/secundarios */
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222 47% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  
+  /* Azul más brillante para detalles menores */
+  --accent: 207 100% 30%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
+
+  /* Rojo Corporativo (#E11C2B) para alertas y acciones destructivas */
+  --destructive: 355 78% 50%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 217 33% 17%;
-  --chart-1: 217 91% 60%;
-  --chart-2: 142 72% 29%;
-  --chart-3: 45 93% 56%;
-  --chart-4: 0 84% 60%;
-  --chart-5: 262 80% 50%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 207 100% 24%;
+
+  /* Paleta de Gráficos de BI (Charts) */
+  --chart-1: 207 100% 24%;  /* Azul Venado */
+  --chart-2: 355 78% 50%;   /* Rojo Venado */
+  --chart-3: 200 95% 39%;   /* Azul Claro */
+  --chart-4: 215 16% 47%;   /* Gris Muted */
+  --chart-5: 142 72% 29%;   /* Verde Exito */
+
   --radius: 0.5rem;
-  --sidebar: 240 10% 98%;
-  --sidebar-foreground: 222 13% 13%;
-  --sidebar-primary: 217 33% 17%;
+
+  /* Configuración de la Barra Lateral (Sidebar) usando el Azul Venado */
+  --sidebar: 207 100% 24%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 355 78% 50%; /* Highlight Rojo Venado al estar activo */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 142 72% 29%;
+  --sidebar-accent: 207 100% 30%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 217 33% 17%;
+  --sidebar-border: 207 100% 20%;
+  --sidebar-ring: 355 78% 50%;
 }
 
 .dark {

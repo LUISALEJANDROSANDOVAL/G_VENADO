@@ -347,13 +347,13 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Map Container */}
-      <Card className="lg:col-span-3 border-border">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 pb-4">
+      <Card className="lg:col-span-3 border-border shadow-sm">
+        <CardHeader className="p-3 pb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
           <div className="flex items-center gap-3 min-w-0">
-            <CardTitle className="shrink-0">Mapa de Operaciones de Campo en Vivo</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider shrink-0">Mapa de Operaciones de Campo en Vivo</CardTitle>
             {selectedWorker && (
-              <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3 py-1 text-xs font-semibold text-primary">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-primary">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                 {selectedWorker.name}
                 <button
                   onClick={() => setSelectedWorkerId(null)}
@@ -402,8 +402,8 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
           </div>
         </CardHeader>
 
-        <CardContent>
-          <div className="bg-slate-100 rounded-lg overflow-hidden relative h-[450px] w-full border border-border">
+        <CardContent className="p-3 pt-0">
+          <div className="bg-slate-100 rounded-lg overflow-hidden relative h-[390px] w-full border border-border">
             <div ref={mapContainerRef} className="h-full w-full z-0" />
 
             {/* Legend (Only route legend when worker is focused) */}
@@ -523,10 +523,10 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       `}</style>
 
       {/* Right Sidebar — Worker list OR sequence detail */}
-      <Card className="border-border">
-        <CardHeader>
+      <Card className="border-border shadow-sm">
+        <CardHeader className="p-3 pb-1">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider">
               {selectedWorker ? 'Secuencia de Ruta' : 'Reponedores Activos'}
             </CardTitle>
             {selectedWorker && (
@@ -539,16 +539,16 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
             )}
           </div>
           {selectedWorker && (
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               {selectedWorker.name} · {workerSequencePdvs.filter(p => p.visited).length} de {workerSequencePdvs.length} visitados
             </p>
           )}
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="p-3 pt-0">
           {/* ── Full list view ── */}
           {!selectedWorker && (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[390px] overflow-y-auto pr-1">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-2">
                 Clic para ver ruta individual
               </p>
@@ -602,7 +602,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
 
           {/* ── Route detail view (selected worker) ── */}
           {selectedWorker && (
-            <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-[390px] overflow-y-auto pr-1">
               {/* Progress summary */}
               <div className="mb-3 p-3 bg-muted/30 rounded-lg border border-border">
                 <div className="flex items-center justify-between mb-1.5 text-xs">

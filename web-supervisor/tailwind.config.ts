@@ -53,6 +53,24 @@ const config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        venado: {
+          blue: {
+            DEFAULT: '#00457C',
+            light: '#1D68A4',
+            dark: '#002E53',
+          },
+          red: {
+            DEFAULT: '#E11C2B',
+            light: '#F34753',
+            dark: '#A8111B',
+          },
+          gray: {
+            bg: '#F8FAFC',
+            border: '#E2E8F0',
+            text: '#64748B',
+          },
+          white: '#FFFFFF',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

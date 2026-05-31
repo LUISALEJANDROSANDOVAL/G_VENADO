@@ -320,43 +320,53 @@ export default function ControlTowerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       {!mockData ? (
-        <>
-          <Navbar />
-          <div className="flex items-center justify-center h-screen">
-            <p className="text-muted-foreground">Cargando panel de control...</p>
+        <div className="h-screen flex overflow-hidden bg-background">
+          <Sidebar 
+            activeModule={activeModule} 
+            onModuleChange={setActiveModule} 
+          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="shrink-0">
+              <Navbar />
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-muted-foreground">Cargando panel de control...</p>
+            </div>
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          <Navbar />
-          {isSeeding && (
-            <div className="bg-primary/10 border-b border-primary/30 px-6 py-3 flex items-center justify-between text-primary text-sm animate-pulse">
-              <span className="flex items-center gap-2 font-medium">
-                ⚙️ La base de datos de Supabase está vacía. Poblando datos iniciales automáticamente...
-              </span>
+        <div className="h-screen flex overflow-hidden bg-background">
+          <Sidebar 
+            activeModule={activeModule} 
+            onModuleChange={setActiveModule} 
+            activeReponedoresCount={mockData?.reponedores?.filter((r: any) => r.status !== 'Completado').length}
+          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="shrink-0">
+              <Navbar />
             </div>
-          )}
-          {errorMsg && (
-            <div className="bg-destructive/10 border-b border-destructive/30 px-6 py-3 text-destructive text-sm flex justify-between items-center">
-              <span>Error de Supabase: {errorMsg}. Mostrando datos locales de respaldo.</span>
-              <button 
-                onClick={loadData}
-                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold px-4 py-1.5 rounded text-xs transition-colors"
-              >
-                Reintentar Conexión
-              </button>
-            </div>
-          )}
-          <div className="flex">
-            <Sidebar 
-              activeModule={activeModule} 
-              onModuleChange={setActiveModule} 
-              activeReponedoresCount={mockData?.reponedores?.filter((r: any) => r.status !== 'Completado').length}
-            />
-            <main className="flex-1 overflow-auto">
-              <div className="p-6 md:p-8 max-w-7xl mx-auto">
+            {isSeeding && (
+              <div className="shrink-0 bg-primary/10 border-b border-primary/30 px-6 py-3 flex items-center justify-between text-primary text-sm animate-pulse">
+                <span className="flex items-center gap-2 font-medium">
+                  ⚙️ La base de datos de Supabase está vacía. Poblando datos iniciales automáticamente...
+                </span>
+              </div>
+            )}
+            {errorMsg && (
+              <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 px-6 py-3 text-destructive text-sm flex justify-between items-center">
+                <span>Error de Supabase: {errorMsg}. Mostrando datos locales de respaldo.</span>
+                <button 
+                  onClick={loadData}
+                  className="bg-destructive hover:bg-destructive/95 text-destructive-foreground font-semibold px-4 py-1.5 rounded text-xs transition-colors"
+                >
+                  Reintentar Conexión
+                </button>
+              </div>
+            )}
+            <main className="flex-1 overflow-y-auto">
+              <div className="p-4 md:p-5 max-w-7xl mx-auto space-y-4">
                 {/* Main Dashboard Module */}
                 {activeModule === 'dashboard' && (
                   <MainDashboard
@@ -374,15 +384,14 @@ export default function ControlTowerDashboard() {
 
                 {/* Analytics Module */}
                 {activeModule === 'analytics' && (
-                  <div className="space-y-8 animate-in fade-in">
+                  <div className="space-y-3 animate-in fade-in">
                     {/* Header Row with Date Filter */}
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
-                        <h1 className="text-3xl font-bold text-foreground mb-2">Analíticas del Panel</h1>
-                        <p className="text-muted-foreground">Métricas de rendimiento e información en tiempo real</p>
+                        <h1 className="text-xl font-extrabold text-foreground tracking-tight">Analíticas del Panel</h1>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                      <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-primary" /> Rango de Fechas:
                         </span>
@@ -420,7 +429,7 @@ export default function ControlTowerDashboard() {
                     </div>
 
                     {/* Operational Filters & Export Row (RF-05) */}
-                    <div className="bg-slate-500/5 border border-border p-4 rounded-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-sm">
+                    <div className="bg-slate-500/5 border border-border p-3.5 rounded-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 shadow-xs">
                       <div className="flex flex-wrap items-center gap-4">
                         {/* City Filter */}
                         <div className="flex items-center gap-2">
@@ -478,26 +487,26 @@ export default function ControlTowerDashboard() {
                       <div className="relative">
                         <button
                           onClick={() => setShowExportDropdown(!showExportDropdown)}
-                          className="bg-primary text-primary-foreground hover:bg-primary/95 font-bold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+                          className="bg-primary text-primary-foreground hover:bg-primary/95 font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer h-8"
                         >
-                          <Download className="h-4 w-4" /> Exportar Reporte BI (CSV/Excel) <ChevronDown className="h-3.5 w-3.5" />
+                          <Download className="h-3.5 w-3.5" /> Exportar Reporte <ChevronDown className="h-3 w-3" />
                         </button>
 
                         {showExportDropdown && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
-                            <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1 text-foreground divide-y divide-border animate-in fade-in slide-in-from-top-1">
+                            <div className="absolute right-0 mt-1.5 w-44 bg-card border border-border rounded-lg shadow-lg z-50 py-1 text-foreground divide-y divide-border animate-in fade-in slide-in-from-top-1">
                               <button
                                 onClick={() => handleExport('PDF')}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium cursor-pointer"
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                               >
-                                <FileText className="h-4 w-4 text-red-500" /> Descargar PDF
+                                <FileText className="h-3.5 w-3.5 text-red-500" /> Descargar PDF
                               </button>
                               <button
                                 onClick={() => handleExport('Excel')}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium cursor-pointer"
+                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-1.5 font-medium cursor-pointer"
                               >
-                                <Table className="h-4 w-4 text-green-600" /> Descargar CSV / Excel
+                                <Table className="h-3.5 w-3.5 text-green-600" /> Descargar CSV / Excel
                               </button>
                             </div>
                           </>
@@ -506,20 +515,19 @@ export default function ControlTowerDashboard() {
                     </div>
 
                     {filteredData && (
-                      <>
+                      <div className="space-y-4">
                         <KPICards data={filteredData.kpis} />
                         <AnalyticsCharts data={filteredData.analytics} />
-                      </>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {/* Live Map Module */}
                 {activeModule === 'map' && (
-                  <div className="space-y-8 animate-in fade-in">
+                  <div className="space-y-3 animate-in fade-in">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Operaciones de Campo en Vivo</h1>
-                      <p className="text-muted-foreground">Seguimiento en tiempo real y gestión de trabajadores</p>
+                      <h1 className="text-xl font-extrabold text-foreground tracking-tight">Operaciones de Campo en Vivo</h1>
                     </div>
 
                     <LiveMap
@@ -533,10 +541,9 @@ export default function ControlTowerDashboard() {
 
                 {/* Route Optimization + History Module */}
                 {activeModule === 'routes' && (
-                  <div className="space-y-8 animate-in fade-in w-full">
+                  <div className="space-y-3 animate-in fade-in w-full">
                     <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Rutas & Historial</h1>
-                      <p className="text-muted-foreground">Optimizar rutas, reasignar reponedores y revisar evidencias por jornada</p>
+                      <h1 className="text-xl font-extrabold text-foreground tracking-tight">Rutas & Historial</h1>
                     </div>
 
                     <RouteManagement
@@ -555,15 +562,15 @@ export default function ControlTowerDashboard() {
 
                 {/* PDV Master Module */}
                 {activeModule === 'pdv' && (
-                  <div className="space-y-8 animate-in fade-in">
+                  <div className="space-y-3 animate-in fade-in">
                     <PDVMaster pdvs={mockData.pdvs} onRefresh={loadData} />
                   </div>
                 )}
               </div>
             </main>
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   )
 }

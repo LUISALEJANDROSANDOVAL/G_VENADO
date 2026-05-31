@@ -52,20 +52,18 @@ export function KPICards({ data }: KPICardsProps) {
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon
         return (
-          <Card key={index} className="border-border">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-foreground/70">{kpi.label}</CardTitle>
-                <div className={`${kpi.lightBg} p-2 rounded-lg`}>
-                  <Icon className="h-4 w-4 text-foreground/60" />
-                </div>
+          <Card key={index} className="border-border shadow-sm">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{kpi.label}</CardTitle>
+              <div className={`${kpi.lightBg} p-1.5 rounded-lg shrink-0`}>
+                <Icon className="h-3.5 w-3.5 text-foreground/70" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="mb-3">
-                <div className="text-2xl font-bold text-foreground">{kpi.value}</div>
+            <CardContent className="p-3 pt-0">
+              <div className="mb-1.5">
+                <div className="text-xl font-extrabold text-foreground">{kpi.value}</div>
               </div>
-              <Progress value={kpi.progress} className="h-2" />
+              <Progress value={kpi.progress} className="h-1" />
             </CardContent>
           </Card>
         )
