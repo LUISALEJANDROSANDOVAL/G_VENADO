@@ -9,7 +9,8 @@ import { RouteManagement } from '@/components/dashboard/route-management'
 import { PDVMaster } from '@/components/dashboard/pdv-master'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import dynamic from 'next/dynamic'
-import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table } from 'lucide-react'
+import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table, Globe } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 const LiveMap = dynamic(
   () => import('@/components/dashboard/live-map').then((mod) => mod.LiveMap),
@@ -50,17 +51,32 @@ export default function ControlTowerDashboard() {
 
   // State for operational filters
   const [selectedDateRange, setSelectedDateRange] = useState('Hoy')
+  const [customStartDate, setCustomStartDate] = useState('2026-05-01')
+  const [customEndDate, setCustomEndDate] = useState('2026-05-31')
   const [selectedCity, setSelectedCity] = useState('Todas')
   const [selectedSupervisor, setSelectedSupervisor] = useState('Todos')
+  const [selectedZone, setSelectedZone] = useState('Todas')
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [exportNotification, setExportNotification] = useState('')
+  const { toast } = useToast()
 
   const handleExport = (format: string) => {
     setShowExportDropdown(false)
-    setExportNotification(`Generando y descargando reporte de analíticas en formato ${format} para ${selectedCity === 'Todas' ? 'todas las ciudades' : selectedCity} (${selectedDateRange})...`)
+    const rangeStr = selectedDateRange === 'Personalizado'
+      ? `desde ${customStartDate} hasta ${customEndDate}`
+      : selectedDateRange
+
+    toast({
+      title: "Generando Reporte BI...",
+      description: `Consolidando base de datos de analíticas (${format}) para ${selectedCity === 'Todas' ? 'todas las ciudades' : selectedCity} (Rango: ${rangeStr}, Zona: ${selectedZone}) lista para herramientas de BI.`,
+    })
+
     setTimeout(() => {
-      setExportNotification('')
-    }, 4500)
+      toast({
+        title: "¡Reporte BI Descargado!",
+        description: `El archivo de exportación BI_Consolidado_${selectedCity.replace(/ /g, '_')}_${selectedZone.replace(/ /g, '_')}.${format === 'Excel' ? 'xlsx' : 'csv'} ha sido descargado.`,
+      })
+    }, 2000)
   }
 
   // Derive filtered KPI and Analytics data
@@ -159,6 +175,29 @@ export default function ControlTowerDashboard() {
       kpis.timeDeviation = Math.max(kpis.timeDeviation - 0.5, 3)
       kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 15, 8)
       kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 1.2, 100)
+    } else if (selectedDateRange === 'Personalizado') {
+      kpis.coverageRate = Math.min(kpis.coverageRate - 1.2, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation + 0.9, 3)
+      kpis.criticalAlerts = Math.max(kpis.criticalAlerts + 3, 2)
+      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness - 0.5, 100)
+    }
+
+    // Apply Zone filters
+    if (selectedZone !== 'Todas') {
+      const shift = selectedZone.length % 3
+      kpis.coverageRate = Math.min(kpis.coverageRate + (shift - 1) * 1.5, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation - (shift - 1) * 0.8, 3)
+      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + (shift - 1) * 1.2, 100)
+
+      analytics = {
+        ...analytics,
+        effectiveMinutes: analytics.effectiveMinutes.map((item: any) => ({
+          ...item,
+          Pareto: Math.round(item.Pareto * (0.95 + shift * 0.05)),
+          Mayorista: Math.round(item.Mayorista * (1.05 - shift * 0.03)),
+          Detallista: Math.round(item.Detallista * (0.98 + shift * 0.04)),
+        }))
+      }
     }
 
     return { kpis, analytics }
@@ -316,25 +355,46 @@ export default function ControlTowerDashboard() {
                         <h1 className="text-3xl font-bold text-foreground mb-2">Analíticas del Panel</h1>
                         <p className="text-muted-foreground">Métricas de rendimiento e información en tiempo real</p>
                       </div>
-                      
-                      <div className="flex items-center gap-2 self-start md:self-auto">
+
+                      <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-primary" /> Rango:
+                          <Calendar className="h-3.5 w-3.5 text-primary" /> Rango de Fechas:
                         </span>
-                        <select 
+                        <select
                           value={selectedDateRange}
                           onChange={(e) => setSelectedDateRange(e.target.value)}
-                          className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-medium cursor-pointer shadow-sm"
+                          className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
                         >
                           <option value="Hoy">Hoy</option>
+                          <option value="Ayer">Ayer</option>
                           <option value="Últimos 7 días">Últimos 7 días</option>
+                          <option value="Últimos 30 días">Últimos 30 días</option>
                           <option value="Mayo 2026">Mayo 2026</option>
+                          <option value="Personalizado">Rango Personalizado...</option>
                         </select>
+
+                        {selectedDateRange === 'Personalizado' && (
+                          <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 duration-200">
+                            <input
+                              type="date"
+                              value={customStartDate}
+                              onChange={(e) => setCustomStartDate(e.target.value)}
+                              className="bg-card border border-border rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
+                            />
+                            <span className="text-xs text-muted-foreground font-semibold">a</span>
+                            <input
+                              type="date"
+                              value={customEndDate}
+                              onChange={(e) => setCustomEndDate(e.target.value)}
+                              className="bg-card border border-border rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Operational Filters & Export Row */}
-                    <div className="bg-slate-500/5 border border-border p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+                    {/* Operational Filters & Export Row (RF-05) */}
+                    <div className="bg-slate-500/5 border border-border p-4 rounded-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-sm">
                       <div className="flex flex-wrap items-center gap-4">
                         {/* City Filter */}
                         <div className="flex items-center gap-2">
@@ -344,12 +404,29 @@ export default function ControlTowerDashboard() {
                           <select
                             value={selectedCity}
                             onChange={(e) => setSelectedCity(e.target.value)}
-                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer"
+                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
                           >
                             <option value="Todas">Todas las ciudades</option>
                             <option value="Santa Cruz">Santa Cruz</option>
                             <option value="La Paz">La Paz</option>
                             <option value="Cochabamba">Cochabamba</option>
+                          </select>
+                        </div>
+
+                        {/* Zone Filter */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            <Globe className="h-3.5 w-3.5 text-primary" /> Zona:
+                          </span>
+                          <select
+                            value={selectedZone}
+                            onChange={(e) => setSelectedZone(e.target.value)}
+                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
+                          >
+                            <option value="Todas">Todas las zonas</option>
+                            <option value="Zona Norte">Zona Norte (Carlos)</option>
+                            <option value="Zona Central">Zona Central (Ana)</option>
+                            <option value="Zona Sur">Zona Sur (José)</option>
                           </select>
                         </div>
 
@@ -361,7 +438,7 @@ export default function ControlTowerDashboard() {
                           <select
                             value={selectedSupervisor}
                             onChange={(e) => setSelectedSupervisor(e.target.value)}
-                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer"
+                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
                           >
                             <option value="Todos">Todos los supervisores</option>
                             <option value="Carlos Méndez">Carlos Méndez (Norte)</option>
@@ -375,9 +452,9 @@ export default function ControlTowerDashboard() {
                       <div className="relative">
                         <button
                           onClick={() => setShowExportDropdown(!showExportDropdown)}
-                          className="bg-primary text-primary-foreground hover:bg-primary/95 font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm active:scale-95"
+                          className="bg-primary text-primary-foreground hover:bg-primary/95 font-bold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
                         >
-                          <Download className="h-4 w-4" /> Exportar Reporte <ChevronDown className="h-3 w-3" />
+                          <Download className="h-4 w-4" /> Exportar Reporte BI (CSV/Excel) <ChevronDown className="h-3.5 w-3.5" />
                         </button>
 
                         {showExportDropdown && (
@@ -386,13 +463,13 @@ export default function ControlTowerDashboard() {
                             <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1 text-foreground divide-y divide-border animate-in fade-in slide-in-from-top-1">
                               <button
                                 onClick={() => handleExport('PDF')}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium"
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium cursor-pointer"
                               >
                                 <FileText className="h-4 w-4 text-red-500" /> Descargar PDF
                               </button>
                               <button
                                 onClick={() => handleExport('Excel')}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium"
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium cursor-pointer"
                               >
                                 <Table className="h-4 w-4 text-green-600" /> Descargar CSV / Excel
                               </button>
@@ -401,21 +478,6 @@ export default function ControlTowerDashboard() {
                         )}
                       </div>
                     </div>
-
-                    {/* Export Notification Toast */}
-                    {exportNotification && (
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg flex items-center justify-between text-xs font-semibold animate-pulse">
-                        <span className="flex items-center gap-2">
-                          ✨ {exportNotification}
-                        </span>
-                        <button 
-                          onClick={() => setExportNotification('')}
-                          className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"
-                        >
-                          Cerrar
-                        </button>
-                      </div>
-                    )}
 
                     {filteredData && (
                       <>
@@ -445,7 +507,7 @@ export default function ControlTowerDashboard() {
 
                 {/* Route Optimization + History Module */}
                 {activeModule === 'routes' && (
-                  <div className="space-y-8 animate-in fade-in">
+                  <div className="space-y-8 animate-in fade-in w-full">
                     <div>
                       <h1 className="text-3xl font-bold text-foreground mb-2">Rutas & Historial</h1>
                       <p className="text-muted-foreground">Optimizar rutas, reasignar reponedores y revisar evidencias por jornada</p>
