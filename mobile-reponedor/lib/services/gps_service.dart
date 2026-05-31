@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 
+import 'session_service.dart';
 import 'supabase_service.dart';
 
 /// Servicio de rastreo GPS en tiempo real (RF-08).
@@ -134,7 +135,7 @@ class GpsService {
   /// nueva coordenada. Nunca acumula filas históricas.
   Future<void> _uploadToSupabase(double latitude, double longitude) async {
     try {
-      final userId = SupabaseService.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       if (userId == null) {
         // Modo demo sin sesión — no hay nada que guardar
         return;

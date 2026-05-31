@@ -6,6 +6,7 @@ import '../models/pdv.dart';
 import '../models/task.dart';
 import 'app_connection_service.dart';
 import 'offline_sync_service.dart';
+import 'session_service.dart';
 import 'supabase_service.dart';
 
 /// Repositorio de Rutas y PDVs.
@@ -190,6 +191,11 @@ class RouteRepository {
     bool isOffline = false,
   }) async {
     final planId = _cachedRoutePlanId ?? 'demo_plan';
+    if (planId == 'demo_plan') {
+      // ignore: avoid_print
+      print('[RouteRepository] Modo Demostración/Fallback: Evitando inserción en base de datos para no causar error de tipo UUID ("demo_plan").');
+      return;
+    }
     final logPayload = {
       'route_plan_id': planId,
       'pos_id': posId,
@@ -231,7 +237,7 @@ class RouteRepository {
   }) async {
     try {
       final client = SupabaseService.client;
-      final userId = client.auth.currentUser?.id ?? 'demo_user';
+      final userId = SessionService.instance.currentUserId ?? 'demo_user';
       final planId = _cachedRoutePlanId ?? 'demo_plan';
       final path = '$userId/$planId/$fileName';
 

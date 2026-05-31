@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/pdv.dart';
@@ -7,6 +8,7 @@ import '../models/visit.dart';
 import '../services/app_connection_service.dart';
 import '../services/gps_service.dart';
 import '../services/route_repository.dart';
+import '../services/session_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mock_route_map.dart';
 import '../widgets/offline_banner.dart';
@@ -34,6 +36,8 @@ class _RouteViewState extends State<RouteView> {
   void initState() {
     super.initState();
     _loadRoute();
+    // Iniciar rastreo GPS de manera preventiva si hay sesión
+    unawaited(GpsService.instance.startLiveTracking());
   }
 
   /// Carga la ruta desde Supabase (RF-06/RF-07) con fallback a MockData.
@@ -44,7 +48,7 @@ class _RouteViewState extends State<RouteView> {
     });
     try {
       // Obtiene el userId autenticado si hay sesión activa
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
       if (mounted) {
         setState(() {
@@ -84,7 +88,7 @@ class _RouteViewState extends State<RouteView> {
     // Invalida caché para forzar recarga desde Supabase
     RouteRepository.instance.invalidateCache();
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
       if (mounted) setState(() => _pdvs = pdvs);
     } catch (_) {
@@ -100,11 +104,12 @@ class _RouteViewState extends State<RouteView> {
     );
   }
 
-  void _logout() {
+  void _logout() async {
     // Detener el GPS y limpiar caché antes de cerrar sesión
     GpsService.instance.stopTracking();
     RouteRepository.instance.invalidateCache();
-    Supabase.instance.client.auth.signOut();
+    await SessionService.instance.clearSession();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil<void>(
       MaterialPageRoute<void>(builder: (_) => const LoginView()),
       (_) => false,
@@ -301,7 +306,7 @@ class _RouteViewState extends State<RouteView> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       children: [
                         RouteProgressHeader(
-                          reponedorName: MockData.mockUser.name,
+                          reponedorName: SessionService.instance.currentUserName ?? 'Reponedor',
                           dateLabel: _dateLabel,
                           completedVisits: _completed,
                           totalVisits: _pdvs.length,

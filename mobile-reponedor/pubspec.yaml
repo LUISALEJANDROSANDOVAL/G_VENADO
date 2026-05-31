@@ -64,6 +64,7 @@ flutter:
 
   # Variables de entorno (plantilla incluida en el repo; copia a .env para valores reales)
   assets:
+    - .env
     - .env.example
     - assets/images/
 

@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
+import '../models/user.dart';
 import '../services/app_connection_service.dart';
 import '../services/gps_service.dart';
+import '../services/session_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/trace_login_colors.dart';
 import '../widgets/connection_status_indicator.dart';
@@ -61,6 +62,11 @@ class _LoginViewState extends State<LoginView> {
     if (username == MockData.mockUser.username && password == 'demo1234') {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
+
+      // Guardar la sesión del usuario demo
+      await SessionService.instance.saveSession(MockData.mockUser);
+      if (!mounted) return;
+
       setState(() => _isLoading = false);
 
       // Intentar GPS aunque sea demo (no bloquea el login si falla)
@@ -80,18 +86,27 @@ class _LoginViewState extends State<LoginView> {
       return;
     }
 
-    // Autenticación Real con Supabase Auth
+    // Autenticación Real con tabla public.users en Supabase
     try {
-      final response = await SupabaseService.client.auth.signInWithPassword(
-        email: username,
-        password: password,
-      );
+      final userRow = await SupabaseService.client
+          .from('users')
+          .select()
+          .eq('email', username)
+          .eq('password', password)
+          .maybeSingle();
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (response.user != null) {
-        // Iniciar rastreo GPS al autenticarse con Supabase
+      if (userRow != null) {
+        // Inicializar el modelo User
+        final user = User.fromJson(userRow);
+
+        // Guardar la sesión
+        await SessionService.instance.saveSession(user);
+        if (!mounted) return;
+
+        // Iniciar rastreo GPS al autenticarse
         unawaited(GpsService.instance.startLiveTracking());
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,18 +121,14 @@ class _LoginViewState extends State<LoginView> {
           MaterialPageRoute<void>(builder: (_) => const RouteView()),
         );
       } else {
-        throw Exception('No se pudo recuperar los datos del usuario autenticado.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error de autenticación: Email o contraseña incorrectos'),
+            backgroundColor: Color(0xFFAA001B), // Rojo TRACE V
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-    } on AuthException catch (authErr) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error de autenticación: ${authErr.message}'),
-          backgroundColor: const Color(0xFFAA001B), // Rojo TRACE V
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);

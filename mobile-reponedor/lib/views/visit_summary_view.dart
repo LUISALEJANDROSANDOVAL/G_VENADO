@@ -183,12 +183,12 @@ void navigateToVisitSummary(
 }) {
   Navigator.of(context).pushReplacement<void, void>(
     MaterialPageRoute<void>(
-      builder: (_) => VisitSummaryView(
+      builder: (summaryContext) => VisitSummaryView(
         visit: visit,
         elapsedSeconds: elapsedSeconds,
         nextPdv: nextPdv,
         onContinue: () {
-          Navigator.of(context).pop();
+          Navigator.of(summaryContext).pop();
           onDone();
         },
       ),

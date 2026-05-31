@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/session_service.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 import 'views/login_view.dart';
+import 'views/route_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,11 +20,18 @@ void main() async {
     }
   }
 
-  // TODO: Supabase se inicializará cuando se integre auth y sync real
+  // Inicializar Supabase
   try {
     await SupabaseService.initialize();
   } catch (e) {
     debugPrint('Supabase no inicializado (modo mock UI): $e');
+  }
+
+  // Inicializar sesión persistente
+  try {
+    await SessionService.instance.initSession();
+  } catch (e) {
+    debugPrint('Error inicializando sesión: $e');
   }
 
   runApp(const FieldOpsApp());
@@ -37,7 +46,9 @@ class FieldOpsApp extends StatelessWidget {
       title: 'TRACE V — Reponedores',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const LoginView(),
+      home: SessionService.instance.isLoggedIn
+          ? const RouteView()
+          : const LoginView(),
     );
   }
 }
