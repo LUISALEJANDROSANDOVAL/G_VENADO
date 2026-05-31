@@ -16,6 +16,12 @@ interface LiveMapProps {
   onSelectWorkerId?: (id: string | null) => void
 }
 
+const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
+  'Cochabamba': { lat: -17.3895, lng: -66.1568, zoom: 12 },
+  'Santa Cruz': { lat: -17.7862, lng: -63.1812, zoom: 12 },
+  'La Paz': { lat: -16.5000, lng: -68.1500, zoom: 12 },
+}
+
 export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorkerId, onSelectWorkerId }: LiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -32,8 +38,38 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const [showDetallista, setShowDetallista] = useState(true)
   const [showWorkers, setShowWorkers] = useState(true)
 
-  // Only show workers who are still actively working
-  const activeReponedores = reponedores.filter(w => w.status !== 'Completado')
+  // Get associated cities dynamically from the PDVs list
+  const associatedCities = Array.from(new Set(pdvs.map(p => p.city).filter(Boolean))) as string[]
+  const sortedCities = ['Todas', ...associatedCities.sort()]
+
+  const [selectedCity, setSelectedCity] = useState<string>('Todas')
+
+  // Sync selectedCity when a worker is selected
+  useEffect(() => {
+    if (selectedWorkerId) {
+      const worker = reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId)
+      if (worker && worker.city) {
+        setSelectedCity(worker.city)
+      }
+    }
+  }, [selectedWorkerId, reponedores])
+
+  const handleCityChange = (city: string) => {
+    setSelectedCity(city)
+    if (selectedWorkerId) {
+      const worker = reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId)
+      if (worker && (city === 'Todas' || worker.city !== city)) {
+        setSelectedWorkerId(null)
+      }
+    }
+  }
+
+  // Filter active reponedores by city
+  const activeReponedores = reponedores.filter(w => {
+    if (w.status === 'Completado') return false
+    if (selectedCity !== 'Todas' && w.city !== selectedCity) return false
+    return true
+  })
 
   const selectedWorker = selectedWorkerId
     ? reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId) ?? null
@@ -66,16 +102,55 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     }
   }, [])
 
+  // Pan and zoom map when selectedCity changes
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+
+    if (selectedCity === 'Todas') {
+      if (pdvs.length > 0) {
+        const points = pdvs.map(p => [p.lat, p.lng] as L.LatLngTuple)
+        try {
+          map.fitBounds(L.latLngBounds(points), { padding: [30, 30] })
+        } catch (_) {}
+      } else {
+        map.setView([-17.0, -65.0], 6)
+      }
+    } else {
+      const coords = CITY_COORDINATES[selectedCity]
+      if (coords) {
+        map.setView([coords.lat, coords.lng], coords.zoom)
+      }
+    }
+  }, [selectedCity])
+
   // Sync markers when pdvs, reponedores, animationTime, or selectedWorkerId changes
   useEffect(() => {
     if (!mapContainerRef.current) return
 
     // 1. Initialize Map
     if (!mapInstanceRef.current) {
+      let centerLat = -17.3895
+      let centerLng = -66.1568
+      let zoom = 11
+
+      if (selectedCity !== 'Todas') {
+        const coords = CITY_COORDINATES[selectedCity]
+        if (coords) {
+          centerLat = coords.lat
+          centerLng = coords.lng
+          zoom = coords.zoom
+        }
+      } else {
+        centerLat = -17.0
+        centerLng = -65.0
+        zoom = 6
+      }
+
       const map = L.map(mapContainerRef.current, {
         zoomControl: true,
         scrollWheelZoom: true,
-      }).setView([-34.61, -58.44], 11)
+      }).setView([centerLat, centerLng], zoom)
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contribuyentes'
@@ -112,6 +187,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       ? pdvs.filter(p => activePdvIds.has(p.id))
       : pdvs
     ).filter(p => {
+      if (selectedCity !== 'Todas' && p.city !== selectedCity) return false
       if (p.type === 'Pareto' && !showPareto) return false
       if (p.type === 'Mayorista' && !showMayorista) return false
       if (p.type === 'Detallista' && !showDetallista) return false
@@ -292,8 +368,15 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
           lat = fallbackPdv.lat
           lng = fallbackPdv.lng
         } else {
-          lat = -34.61
-          lng = -58.44
+          const wCity = worker.city || 'Santa Cruz'
+          const cityCoords = {
+            'Cochabamba': { lat: -17.3895, lng: -66.1568 },
+            'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
+            'La Paz': { lat: -16.5000, lng: -68.1500 }
+          }
+          const coords = cityCoords[wCity as keyof typeof cityCoords] || cityCoords['Santa Cruz']
+          lat = coords.lat
+          lng = coords.lng
         }
       }
 
@@ -332,7 +415,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     }
 
     return () => { markerGroup.remove() }
-  }, [pdvs, reponedores, animationTime, selectedWorkerId, showPareto, showMayorista, showDetallista, showWorkers])
+  }, [pdvs, reponedores, animationTime, selectedWorkerId, showPareto, showMayorista, showDetallista, showWorkers, selectedCity])
 
   // Build ordered PDV list for selected worker's sidebar detail
   const workerSequencePdvs: Array<PDV & { seqIndex: number }> = selectedWorker
@@ -349,8 +432,24 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       {/* Map Container */}
       <Card className="lg:col-span-3 border-border shadow-sm">
         <CardHeader className="p-3 pb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             <CardTitle className="text-xs font-bold uppercase tracking-wider shrink-0">Mapa de Operaciones de Campo en Vivo</CardTitle>
+            
+            {/* City Selector */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <select
+                value={selectedCity}
+                onChange={(e) => handleCityChange(e.target.value)}
+                className="bg-muted border border-border text-foreground text-[10px] sm:text-xs font-semibold rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:bg-muted/80 transition-colors"
+              >
+                {sortedCities.map((city) => (
+                  <option key={city} value={city} className="bg-card text-foreground font-semibold">
+                    {city === 'Todas' ? '📍 Todas las Ciudades' : `🏢 ${city}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {selectedWorker && (
               <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-primary">
                 <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
-import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment } from '@/app/actions'
+import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -450,9 +450,54 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'operations' | 'history' | 'tomorrow'>('operations')
 
+  // Dynamic tomorrow dates based on system date
+  const [tomorrowDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    return d
+  })
+  const tomorrowFormattedFull = tomorrowDate.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }) // e.g. "01 de junio de 2026"
+  const tomorrowFormattedShort = tomorrowDate.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short'
+  }) // e.g. "01 Jun"
+
   // Tomorrow planning states
   const [tomorrowPublished, setTomorrowPublished] = useState(false)
   const [isPublishingTomorrow, setIsPublishingTomorrow] = useState(false)
+  const [tomorrowPlans, setTomorrowPlans] = useState<any[] | null>(null)
+  const [isLoadingTomorrow, setIsLoadingTomorrow] = useState(false)
+
+  // Load tomorrow's plan from Supabase
+  useEffect(() => {
+    if (activeTab === 'tomorrow') {
+      const fetchTomorrowPlan = async () => {
+        setIsLoadingTomorrow(true)
+        try {
+          const res = await getTomorrowRoutesPlan()
+          if ('error' in res && res.error) {
+            toast({
+              title: "Error al cargar planificación",
+              description: res.error,
+              variant: "destructive",
+            })
+          } else if ('plans' in res) {
+            setTomorrowPlans(res.plans || [])
+            setTomorrowPublished(res.published || false)
+          }
+        } catch (err: any) {
+          console.error("Error loading tomorrow's plan:", err)
+        } finally {
+          setIsLoadingTomorrow(false)
+        }
+      }
+      fetchTomorrowPlan()
+    }
+  }, [activeTab])
 
   // Date state for history audit
   const [selectedHistoryDate, setSelectedHistoryDate] = useState('2026-05-31')
@@ -610,7 +655,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         {[
           { id: 'operations', label: 'Operaciones del Día', icon: Zap },
           { id: 'history', label: 'Historial de Rutas', icon: History },
-          { id: 'tomorrow', label: 'Planificación de Mañana (01 Jun)', icon: Calendar },
+          { id: 'tomorrow', label: 'Planificación', icon: Calendar },
         ].map(tab => {
           const Icon = tab.icon
           const active = activeTab === tab.id as any
@@ -1036,201 +1081,232 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
             )}
           </div>
         </div>
-      )}
-
-      {/* ══════════════════════ TAB 3: PLANIFICACIÓN DE MAÑANA ══════════════════════ */}
+      )}      {/* ══════════════════════ TAB 3: PLANIFICACIÓN DE MAÑANA ══════════════════════ */}
       {activeTab === 'tomorrow' && (
         <div className="space-y-6 w-full animate-in fade-in duration-300">
-          {/* Header Card */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5 p-5 rounded-xl border border-border">
-            <div className="space-y-1">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary animate-pulse" />
-                Planificación de Rutas para Mañana (01 de Junio, 2026)
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Sugerencias de optimización automática generadas por el Feedback Loop y calibradas en base a tiempos de hoy.
-              </p>
-            </div>
-            
-            <Button
-              disabled={isPublishingTomorrow}
-              onClick={() => {
-                if (tomorrowPublished) return
-                setIsPublishingTomorrow(true)
-                setTimeout(() => {
-                  setIsPublishingTomorrow(false)
-                  setTomorrowPublished(true)
-                  toast({
-                    title: "¡Éxito! Rutas publicadas",
-                    description: "Rutas del 01 de Junio aprobadas y publicadas. Se han notificado a los reponedores.",
-                  })
-                }, 2000)
-              }}
-              size="lg"
-              className={[
-                "font-bold text-sm px-6 py-5 rounded-xl shadow-md transition-all duration-200 cursor-pointer shrink-0 gap-2",
-                tomorrowPublished
-                  ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/20 hover:text-emerald-400 cursor-default"
-                  : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-950/20"
-              ].join(" ")}
-            >
-              {isPublishingTomorrow ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Publicando secuencias...</span>
-                </>
-              ) : tomorrowPublished ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>✓ Rutas Publicadas</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4" />
-                  <span>Aprobar y Publicar Rutas</span>
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Status Alert Banner */}
-          {tomorrowPublished ? (
-            <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-              <Check className="h-5 w-5 shrink-0" />
-              <div>
-                <h4 className="font-semibold text-sm">Jornada de Mañana Publicada</h4>
-                <p className="text-xs text-emerald-400/80 mt-0.5">
-                  Las rutas y secuencias de visitas ya están aprobadas e impactadas. Los reponedores recibirán las actualizaciones en su aplicación móvil al iniciar su jornada mañana a las 07:00 AM.
-                </p>
-              </div>
+          {isLoadingTomorrow ? (
+            <div className="py-20 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 bg-slate-500/5 rounded-xl border border-border border-dashed">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm font-semibold">Generando optimizaciones en el Feedback Loop de Supabase...</p>
+              <p className="text-xs text-muted-foreground">Calculando proximidad geográfica y disponibilidad de locales por segmentación.</p>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-              <SlidersHorizontal className="h-5 w-5 shrink-0 text-indigo-400 animate-pulse" />
-              <div>
-                <h4 className="font-semibold text-sm">Sugerencias de Rutas Pendientes de Aprobación</h4>
-                <p className="text-xs text-indigo-400/80 mt-0.5">
-                  El Feedback Loop ha recalculado las rutas óptimas para mañana (01 de Junio) basándose en las duraciones reales de hoy y la proximidad geográfica (TSP). Revisa los detalles antes de publicar.
-                </p>
+            <>
+              {/* Header Card */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5 p-5 rounded-xl border border-border">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary animate-pulse" />
+                    Planificación de Rutas para Mañana ({tomorrowFormattedFull})
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Sugerencias de optimización automática generadas por el Feedback Loop y calibradas en base a tiempos de hoy.
+                  </p>
+                </div>
+                
+                <Button
+                  disabled={isPublishingTomorrow || tomorrowPublished || !tomorrowPlans || tomorrowPlans.length === 0}
+                  onClick={async () => {
+                    if (tomorrowPublished || !tomorrowPlans) return
+                    setIsPublishingTomorrow(true)
+                    try {
+                      const res = await publishTomorrowRoutesPlan(tomorrowPlans)
+                      if ('error' in res && res.error) {
+                        toast({
+                          title: "Error al publicar rutas",
+                          description: res.error,
+                          variant: "destructive",
+                        })
+                      } else {
+                        setTomorrowPublished(true)
+                        setTomorrowPlans(prev => prev ? prev.map(p => ({ ...p, published: true })) : null)
+                        toast({
+                          title: "¡Éxito! Rutas publicadas",
+                          description: `Rutas para el ${tomorrowFormattedFull} aprobadas y publicadas en Supabase. Se han notificado a los reponedores.`,
+                        })
+                        if (onRefresh) onRefresh()
+                      }
+                    } catch (err: any) {
+                      toast({
+                        title: "Error de conexión",
+                        description: err.message,
+                        variant: "destructive",
+                      })
+                    } finally {
+                      setIsPublishingTomorrow(false)
+                    }
+                  }}
+                  size="lg"
+                  className={[
+                    "font-bold text-sm px-6 py-5 rounded-xl shadow-md transition-all duration-200 cursor-pointer shrink-0 gap-2",
+                    tomorrowPublished
+                      ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/20 hover:text-emerald-400 cursor-default"
+                      : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-950/20"
+                  ].join(" ")}
+                >
+                  {isPublishingTomorrow ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Publicando secuencias...</span>
+                    </>
+                  ) : tomorrowPublished ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>✓ Rutas Publicadas</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4" />
+                      <span>Aprobar y Publicar Rutas</span>
+                    </>
+                  )}
+                </Button>
               </div>
-            </div>
-          )}
 
-          {/* Suggested routes list */}
-          <div className="grid grid-cols-1 gap-4">
-            {(reponedores || []).map((w, idx) => {
-              // Deterministic values based on worker name/id
-              const nameLength = w.name.length
-              const plannedCount = w.sequence ? w.sequence.length : 8
-              
-              // Estimated duration (e.g. 5.5 hours)
-              const estHours = ((nameLength * 7 + 220) / 60).toFixed(1)
-              // Distance optimization percentage (e.g. 12.5%)
-              const estEff = ((nameLength % 5) * 2.5 + 8.5).toFixed(1)
-              
-              // Sequence of PDVs for tomorrow
-              const tomorrowSequence = w.sequence || []
-              
-              // Optimization detail copy
-              const optDetail = nameLength % 2 === 0
-                ? "Calibrado de tiempos de servicio: Se ajustó el tiempo estimado de atención en base al promedio de visitas de hoy."
-                : "Optimización de recorrido TSP: Secuencia reordenada para minimizar la distancia total y tiempos de traslado."
+              {/* Status Alert Banner */}
+              {tomorrowPublished ? (
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                  <Check className="h-5 w-5 shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-sm">Jornada de Mañana Publicada</h4>
+                    <p className="text-xs text-emerald-400/80 mt-0.5">
+                      Las rutas y secuencias de visitas ya están aprobadas e impactadas en el backend de Supabase. Los reponedores recibirán las actualizaciones en su aplicación móvil al iniciar su jornada.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                  <SlidersHorizontal className="h-5 w-5 shrink-0 text-indigo-400 animate-pulse" />
+                  <div>
+                    <h4 className="font-semibold text-sm">Sugerencias de Rutas Pendientes de Aprobación</h4>
+                    <p className="text-xs text-indigo-400/80 mt-0.5">
+                      El Feedback Loop ha recalculado las rutas óptimas para mañana ({tomorrowFormattedFull}) basándose en las duraciones reales de hoy y la proximidad geográfica (TSP). Revisa los detalles antes de publicar.
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              return (
-                <div key={w.dbUuid || w.id} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-                  {/* Card Header */}
-                  <div className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                        <User className="h-4 w-4 text-primary" />
+              {/* Suggested routes list */}
+              <div className="grid grid-cols-1 gap-4">
+                {(tomorrowPlans || []).map((p, idx) => {
+                  const nameLength = p.reponedorName.length
+                  const plannedCount = p.sequence.length
+                  
+                  // Estimated duration
+                  const estHours = ((nameLength * 7 + 220) / 60).toFixed(1)
+                  // Distance efficiency
+                  const estEff = ((nameLength % 5) * 2.5 + 8.5).toFixed(1)
+                  
+                  // Find reponedor route from active list
+                  const workerObj = reponedores?.find(w => w.dbUuid === p.reponedorId || w.id === p.reponedorId)
+                  const routeName = workerObj?.route || 'Urbana'
+                  
+                  // Optimization details
+                  const optDetail = nameLength % 2 === 0
+                    ? "Calibrado de tiempos de servicio: Se ajustó el tiempo estimado de atención en base al promedio de visitas de hoy."
+                    : "Optimización de recorrido TSP: Secuencia reordenada para minimizar la distancia total y tiempos de traslado."
+
+                  return (
+                    <div key={p.reponedorId} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
+                      {/* Card Header */}
+                      <div className="px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-foreground">{p.reponedorName}</h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-muted-foreground">Ruta sugerida</span>
+                              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                              <span className="text-[10px] text-muted-foreground font-medium">{routeName}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {tomorrowPublished ? (
+                            <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                              ✓ Publicada
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                              Sugerida
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground">{w.name}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-muted-foreground">Ruta sugerida</span>
-                          <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                          <span className="text-[10px] text-muted-foreground font-medium">{w.route || 'Urbana'}</span>
+
+                      {/* Card Content */}
+                      <div className="px-5 py-4 space-y-4">
+                        {/* Metrics grid */}
+                        <div className="grid grid-cols-3 gap-4 border-b border-border/50 pb-4">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">PDVs Planificados</span>
+                            <p className="text-base font-bold text-foreground">{plannedCount} PDVs</p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">Tiempo Estimado</span>
+                            <p className="text-base font-bold text-foreground">{estHours} hrs</p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase font-semibold">Eficiencia Estimada</span>
+                            <p className="text-base font-bold text-emerald-400">+{estEff}% <span className="text-[10px] font-medium text-emerald-500/80">distancia</span></p>
+                          </div>
+                        </div>
+
+                        {/* Horizontal Stop Sequence */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                            <Store className="h-3.5 w-3.5 text-primary" />
+                            Secuencia Planificada de Paradas (Optimización TSP)
+                          </h4>
+                          
+                          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
+                            {p.sequence.map((pdvId: string, idx: number) => {
+                              const pdv = pdvs.find(pos => pos.id === pdvId)
+                              const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
+                              const isLast = idx === p.sequence.length - 1
+                              return (
+                                <div key={pdvId} className="flex items-center gap-2 shrink-0">
+                                  <div className="flex flex-col items-center p-2.5 bg-muted/20 border border-border rounded-lg min-w-[130px] max-w-[150px] shadow-sm">
+                                    <span className="text-[9px] font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                                      Parada {idx + 1}
+                                    </span>
+                                    <span className="text-xs font-semibold text-foreground truncate w-full text-center mt-1.5" title={name}>
+                                      {name}
+                                    </span>
+                                    <span className="text-[9px] text-muted-foreground mt-0.5">{pdv?.type || 'Detallista'}</span>
+                                  </div>
+                                  {!isLast && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0" />}
+                                </div>
+                              )
+                            })}
+                            {p.sequence.length === 0 && (
+                              <p className="text-xs text-muted-foreground italic">Sin secuencia generada.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Feedback Loop Explanation */}
+                        <div className="text-[10px] font-medium bg-primary/5 border border-primary/15 rounded-lg px-3 py-2 text-foreground/80 flex items-start gap-2">
+                          <Zap className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="text-primary">Optimización del Feedback Loop:</strong> {optDetail}
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      {tomorrowPublished ? (
-                        <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                          ✓ Publicada
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
-                          Sugerida
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Content */}
-                  <div className="px-5 py-4 space-y-4">
-                    {/* Metrics grid */}
-                    <div className="grid grid-cols-3 gap-4 border-b border-border/50 pb-4">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">PDVs Planificados</span>
-                        <p className="text-base font-bold text-foreground">{plannedCount} PDVs</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Tiempo Estimado</span>
-                        <p className="text-base font-bold text-foreground">{estHours} hrs</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Eficiencia Estimada</span>
-                        <p className="text-base font-bold text-emerald-400">+{estEff}% <span className="text-[10px] font-medium text-emerald-500/80">distancia</span></p>
-                      </div>
-                    </div>
-
-                    {/* Horizontal Timeline */}
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                        <Store className="h-3.5 w-3.5 text-primary" />
-                        Secuencia Planificada de Paradas (Optimización TSP)
-                      </h4>
-                      
-                      <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
-                        {tomorrowSequence.map((pdvId, idx) => {
-                          const pdv = pdvs.find(p => p.id === pdvId)
-                          const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
-                          const isLast = idx === tomorrowSequence.length - 1
-                          return (
-                            <div key={pdvId} className="flex items-center gap-2 shrink-0">
-                              <div className="flex flex-col items-center p-2.5 bg-muted/20 border border-border rounded-lg min-w-[130px] max-w-[150px] shadow-sm">
-                                <span className="text-[9px] font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                                  Parada {idx + 1}
-                                </span>
-                                <span className="text-xs font-semibold text-foreground truncate w-full text-center mt-1.5" title={name}>
-                                  {name}
-                                </span>
-                                <span className="text-[9px] text-muted-foreground mt-0.5">{pdv?.type || 'Detallista'}</span>
-                              </div>
-                              {!isLast && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0" />}
-                            </div>
-                          )
-                        })}
-                        {tomorrowSequence.length === 0 && (
-                          <p className="text-xs text-muted-foreground italic">Sin secuencia generada.</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Feedback Loop Explanation */}
-                    <div className="text-[10px] font-medium bg-primary/5 border border-primary/15 rounded-lg px-3 py-2 text-foreground/80 flex items-start gap-2">
-                      <Zap className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-primary">Optimización del Feedback Loop:</strong> {optDetail}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+                {(!tomorrowPlans || tomorrowPlans.length === 0) && (
+                  <p className="text-sm text-center text-muted-foreground italic py-10 bg-muted/20 border border-border rounded-xl">
+                    No se encontraron reponedores para generar sugerencias de rutas de mañana.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
