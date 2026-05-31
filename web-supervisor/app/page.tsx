@@ -40,6 +40,7 @@ export default function ControlTowerDashboard() {
     kpis: any
     analytics: any
     routeOpt: any
+    photoEvidences?: any[]
   } | null>(null)
   
   const [isDbEmpty, setIsDbEmpty] = useState(false)
@@ -69,7 +70,7 @@ export default function ControlTowerDashboard() {
           analytics: generateAnalyticsData(),
           routeOpt: generateRouteOptData(),
         })
-      } else {
+      } else if (res.data) {
         setIsDbEmpty(false)
         setErrorMsg('')
         setMockData(res.data)
@@ -171,6 +172,7 @@ export default function ControlTowerDashboard() {
                     pdvs={mockData.pdvs}
                     reponedores={mockData.reponedores}
                     kpis={mockData.kpis}
+                    photoEvidences={mockData.photoEvidences || []}
                     onViewOnMap={(workerId) => {
                       setSelectedWorkerId(workerId)
                       setActiveModule('map')

@@ -344,7 +344,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
           {/* Simulation Playback Controls */}
           <div className="flex items-center gap-2 bg-muted/60 p-1.5 rounded-lg border border-border shrink-0">
             <Button
-              size="xs"
+              size="sm"
               variant={isPlaying ? 'ghost' : 'secondary'}
               onClick={() => setIsPlaying(false)}
               className="h-7 px-2 cursor-pointer text-xs flex items-center gap-1"
@@ -352,7 +352,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
               <Pause className="h-3 w-3" /> Pausar
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant={isPlaying ? 'secondary' : 'ghost'}
               onClick={() => setIsPlaying(true)}
               className="h-7 px-2 cursor-pointer text-xs flex items-center gap-1"
