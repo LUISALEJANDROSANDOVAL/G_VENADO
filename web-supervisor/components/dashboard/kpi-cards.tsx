@@ -1,15 +1,17 @@
 'use client'
 
-import { TrendingUp, AlertCircle, Users, Clock } from 'lucide-react'
+import { TrendingUp, AlertCircle, Users, Clock, ClipboardCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import type { KPIData } from '@/lib/mock-data'
 
 interface KPICardsProps {
-  data: KPIData
+  data: KPIData & { visitEffectiveness?: number }
 }
 
 export function KPICards({ data }: KPICardsProps) {
+  const effectiveness = data.visitEffectiveness ?? 92.4
+
   const kpis = [
     {
       icon: TrendingUp,
@@ -28,14 +30,6 @@ export function KPICards({ data }: KPICardsProps) {
       lightBg: 'bg-orange-50',
     },
     {
-      icon: Users,
-      label: 'Reponedores Activos',
-      value: `${data.activeWorkers}/${data.totalWorkers}`,
-      progress: (data.activeWorkers / data.totalWorkers) * 100,
-      color: 'bg-chart-2',
-      lightBg: 'bg-emerald-50',
-    },
-    {
       icon: AlertCircle,
       label: 'Alertas Críticas',
       value: data.criticalAlerts.toString(),
@@ -43,10 +37,18 @@ export function KPICards({ data }: KPICardsProps) {
       color: 'bg-destructive',
       lightBg: 'bg-red-50',
     },
+    {
+      icon: ClipboardCheck,
+      label: 'Efectividad de Visitas',
+      value: `${effectiveness.toFixed(1)}%`,
+      progress: effectiveness,
+      color: 'bg-chart-2',
+      lightBg: 'bg-emerald-50',
+    },
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon
         return (
@@ -71,3 +73,4 @@ export function KPICards({ data }: KPICardsProps) {
     </div>
   )
 }
+

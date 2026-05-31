@@ -7,9 +7,10 @@ import { cn } from '@/lib/utils'
 interface SidebarProps {
   activeModule: string
   onModuleChange: (module: string) => void
+  activeReponedoresCount?: number
 }
 
-export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }: SidebarProps) {
   const modules = [
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
     { id: 'map', label: 'Seguimiento en Vivo', icon: Map },
@@ -56,7 +57,9 @@ export function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
           </div>
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-chart-2"></div>
-            <span className="text-sm text-sidebar-foreground/80">12 Reponedores Activos</span>
+            <span className="text-sm text-sidebar-foreground/80">
+              {activeReponedoresCount !== undefined ? `${activeReponedoresCount} Reponedores Activos` : '12 Reponedores Activos'}
+            </span>
           </div>
         </div>
       </div>

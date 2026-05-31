@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   AlertTriangle, Zap, Check, Loader2, History, ChevronDown, ChevronRight,
-  Camera, Clock, User, Store, MapPin, X, ArrowRight
+  Camera, Clock, User, Store, MapPin, X, ArrowRight, Route, SlidersHorizontal
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -448,10 +448,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [activeTab, setActiveTab] = useState<'operations' | 'history'>('operations')
 
   const loadingMessages = [
-    'Calculando matriz de distancias con PostGIS...',
-    'Analizando tiempos históricos de microtareas en campo...',
-    'Ejecutando algoritmo Nearest-Neighbor TSP...',
-    'Persistiendo secuencias optimizadas en Supabase...'
+    'Calculando distancias y traslados...',
+    'Analizando tiempos históricos de visitas en campo...',
+    'Determinando orden óptimo de paradas...',
+    'Guardando secuencias actualizadas...'
   ]
 
   const handleOptimize = async () => {
@@ -606,11 +606,11 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
           {/* ── Paso 1: Resumen del estado actual ─────────────────────────── */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">1</div>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="h-5 w-5 text-primary shrink-0" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Diagnóstico del Día</h2>
-                <p className="text-xs text-muted-foreground">Resumen operativo calculado en tiempo real desde Supabase</p>
+                <p className="text-xs text-muted-foreground">Resumen operativo calculado en tiempo real</p>
               </div>
             </div>
 
@@ -661,8 +661,8 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
           {/* ── Paso 2: Reoptimizar Rutas ───────────────────────────────── */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">2</div>
+            <div className="flex items-center gap-2 mb-3">
+              <Route className="h-5 w-5 text-primary shrink-0" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Reoptimizar Rutas del Día</h2>
                 <p className="text-xs text-muted-foreground">
@@ -671,51 +671,56 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4">
+            <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-5">
               {/* Cómo funciona */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
-                {[
-                  {
-                    step: '①',
-                    title: 'Lee tiempos reales',
-                    desc: 'Analiza el historial de task_logs para saber cuánto tarda cada reponedor en Pareto, Mayorista y Detallista',
-                    color: 'border-violet-500/25 bg-violet-500/5 text-violet-300',
-                  },
-                  {
-                    step: '②',
-                    title: 'Calcula distancias',
-                    desc: 'Usa la fórmula Haversine entre coordenadas de PDVs para estimar tiempos de traslado en metros reales',
-                    color: 'border-sky-500/25 bg-sky-500/5 text-sky-300',
-                  },
-                  {
-                    step: '③',
-                    title: 'Aplica el algoritmo TSP',
-                    desc: 'Ordena la secuencia con Nearest-Neighbor: 60% peso duración + 40% peso distancia + intercalado estratégico',
-                    color: 'border-emerald-500/25 bg-emerald-500/5 text-emerald-300',
-                  },
-                ].map(c => (
-                  <div key={c.step} className={`rounded-lg border p-3 ${c.color}`}>
-                    <div className="text-base font-bold mb-1">{c.step} {c.title}</div>
-                    <p className="text-muted-foreground leading-relaxed">{c.desc}</p>
+              <div className="flex flex-col sm:flex-row justify-between gap-6 text-xs border-b border-border pb-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <Clock className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">1. Tiempos de Atención</h4>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed mt-0.5">
+                      Analiza la duración real de las tareas completadas por canal de cliente.
+                    </p>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex items-start gap-3 flex-1">
+                  <MapPin className="h-5 w-5 text-sky-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">2. Distancias Geográficas</h4>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed mt-0.5">
+                      Calcula las rutas más cortas entre los puntos de venta asignados.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 flex-1">
+                  <Zap className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-foreground">3. Balance de Secuencia</h4>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed mt-0.5">
+                      Intercala paradas complejas y sencillas para reducir la fatiga de la ruta.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1 border-t border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <Button
                   onClick={handleOptimize}
                   disabled={isOptimizing}
-                  className="gap-2 bg-primary hover:bg-primary/90 cursor-pointer"
+                  size="lg"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer shrink-0"
                 >
                   {isOptimizing
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /><span>Optimizando...</span></>
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /><span>Optimizando Rutas...</span></>
                     : <><Zap className="h-4 w-4" /><span>Reoptimizar Rutas Ahora</span></>
                   }
                 </Button>
 
                 {isOptimizing ? (
-                  <div className="text-xs font-semibold text-accent animate-pulse flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-accent animate-ping" />
+                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-pulse flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
                     {loadingMessages[optimizeStep]}
                   </div>
                 ) : optimized ? (
@@ -733,12 +738,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
           {/* ── Paso 3: Contingencias en caliente ─────────────────────────── */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-destructive text-destructive-foreground text-xs font-bold shrink-0">3</div>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Gestión de Contingencias en Tiempo Real</h2>
                 <p className="text-xs text-muted-foreground">
-                  Actúa sobre situaciones críticas del campo sin interrumpir la jornada — los cambios se aplican instantáneamente en Supabase
+                  Actúa sobre situaciones críticas del campo sin interrumpir la jornada — los cambios se aplican instantáneamente
                 </p>
               </div>
             </div>
@@ -795,12 +800,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   </div>
                 </div>
                 <div className="p-3 space-y-2">
-                  {data.pendingRisk.map((pdv) => {
+                  {data.pendingRisk.map((pdv, idx) => {
                     const recommended = getRecommendedWorker(pdv)
                     const currentSelected = selectedTargets[pdv.id] || ''
                     const impact = getImpactEstimate(pdv, currentSelected)
                     return (
-                      <div key={pdv.id} className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/15 space-y-2">
+                      <div key={`${pdv.id}-${pdv.assignedWorker}-${idx}`} className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/15 space-y-2">
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="font-semibold text-sm text-foreground">{pdv.name}</div>
@@ -874,12 +879,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
           {/* ── Paso 4: Feedback Loop ──────────────────────────────────────── */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-accent text-accent-foreground text-xs font-bold shrink-0">4</div>
+            <div className="flex items-center gap-2 mb-3">
+              <SlidersHorizontal className="h-5 w-5 text-accent shrink-0" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Ajustes Logísticos Inteligentes</h2>
                 <p className="text-xs text-muted-foreground">
-                  El sistema compara el tiempo planificado en la BD contra las duraciones reales registradas por la app Flutter y sugiere actualizaciones
+                  El sistema compara el tiempo planificado contra las duraciones reales reportadas desde el celular y sugiere actualizaciones
                 </p>
               </div>
             </div>
@@ -894,7 +899,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                     </p>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
-                    Al aprobar, se actualiza <code className="bg-muted px-1 rounded">points_of_sale.base_duration_minutes</code> en Supabase
+                    Al aprobar, se actualiza el tiempo estimado de atención planificado de forma automática
                   </p>
                 </div>
                 <div className="divide-y divide-border/50">

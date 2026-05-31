@@ -243,76 +243,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
         </div>
       )}
 
-      {/* Clima y Tráfico (Factores Externos) */}
-      <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-3">
-        <div className="flex items-center justify-between border-b border-border/60 pb-2">
-          <div className="flex items-center gap-2">
-            <Car className="h-4.5 w-4.5 text-emerald-600" />
-            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-              Factores Externos en Vivo (Ciudades Principales)
-            </h3>
-          </div>
-          <span className="text-[10px] text-muted-foreground font-semibold">Última actualización: hace 2 min</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Santa Cruz */}
-          <div className="flex items-center justify-between p-2.5 bg-muted/20 border border-border/40 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <div className={weatherData.scz.icon === 'sun' ? "p-1.5 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.scz.icon === 'rain' ? "p-1.5 bg-blue-500/10 rounded-lg text-blue-500" : "p-1.5 bg-slate-500/10 rounded-lg text-slate-500"}>
-                {weatherData.scz.icon === 'sun' ? <Sun className="h-4.5 w-4.5" /> : weatherData.scz.icon === 'rain' ? <CloudRain className="h-4.5 w-4.5" /> : <Cloud className="h-4.5 w-4.5" />}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-foreground">Santa Cruz de la Sierra</p>
-                <p className="text-[10px] text-muted-foreground">{weatherData.scz.temp}°C • {weatherData.scz.text}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <Badge variant="outline" className="text-[8px] font-extrabold border-rose-500/30 text-rose-500 bg-rose-500/5 px-1.5 py-0.5">
-                TRÁFICO ALTO (+15m)
-              </Badge>
-              <p className="text-[8px] text-muted-foreground mt-0.5">Congestión en 2do Anillo</p>
-            </div>
-          </div>
-
-          {/* La Paz */}
-          <div className="flex items-center justify-between p-2.5 bg-muted/20 border border-border/40 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <div className={weatherData.lpz.icon === 'sun' ? "p-1.5 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.lpz.icon === 'rain' ? "p-1.5 bg-blue-500/10 rounded-lg text-blue-500" : "p-1.5 bg-slate-500/10 rounded-lg text-slate-500"}>
-                {weatherData.lpz.icon === 'sun' ? <Sun className="h-4.5 w-4.5" /> : weatherData.lpz.icon === 'rain' ? <CloudRain className="h-4.5 w-4.5" /> : <Cloud className="h-4.5 w-4.5" />}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-foreground">La Paz (Sede de Gobierno)</p>
-                <p className="text-[10px] text-muted-foreground">{weatherData.lpz.temp}°C • {weatherData.lpz.text}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <Badge variant="outline" className="text-[8px] font-extrabold border-amber-500/30 text-amber-600 bg-amber-500/5 px-1.5 py-0.5">
-                TRÁFICO MEDIO (+8m)
-              </Badge>
-              <p className="text-[8px] text-muted-foreground mt-0.5">Demoras en Av. Mariscal Santa Cruz</p>
-            </div>
-          </div>
-
-          {/* Cochabamba */}
-          <div className="flex items-center justify-between p-2.5 bg-muted/20 border border-border/40 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <div className={weatherData.cbb.icon === 'sun' ? "p-1.5 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.cbb.icon === 'rain' ? "p-1.5 bg-blue-500/10 rounded-lg text-blue-500" : "p-1.5 bg-slate-500/10 rounded-lg text-slate-500"}>
-                {weatherData.cbb.icon === 'sun' ? <Sun className="h-4.5 w-4.5" /> : weatherData.cbb.icon === 'rain' ? <CloudRain className="h-4.5 w-4.5" /> : <Cloud className="h-4.5 w-4.5" />}
-              </div>
-              <div>
-                <p className="text-xs font-bold text-foreground">Cochabamba (Valles)</p>
-                <p className="text-[10px] text-muted-foreground">{weatherData.cbb.temp}°C • {weatherData.cbb.text}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <Badge variant="outline" className="text-[8px] font-extrabold border-emerald-500/30 text-emerald-600 bg-emerald-500/5 px-1.5 py-0.5">
-                TRÁFICO FLUIDO
-              </Badge>
-              <p className="text-[8px] text-muted-foreground mt-0.5">Sin demoras reportadas</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Moved: Clima y Tráfico is now located at the bottom of the right sidebar */}
 
       {/* KPI Cards section */}
       <KPICards data={kpis} />
@@ -800,29 +731,31 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   No hay alertas críticas registradas en este momento.
                 </div>
               ) : (
-                delayedWorkers.map((worker) => (
-                  <div 
-                    key={worker.id} 
-                    className="flex flex-col gap-2 p-3.5 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 rounded-xl transition-all cursor-pointer"
-                    onClick={() => onViewOnMap(worker.dbUuid || worker.id)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-bold text-foreground">{worker.name}</p>
-                        <p className="text-[10px] text-muted-foreground">Ruta: {worker.route}</p>
+                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-2">
+                  {delayedWorkers.map((worker) => (
+                    <div 
+                      key={worker.id} 
+                      className="flex flex-col gap-2 p-3.5 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 rounded-xl transition-all cursor-pointer"
+                      onClick={() => onViewOnMap(worker.dbUuid || worker.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{worker.name}</p>
+                          <p className="text-[10px] text-muted-foreground">Ruta: {worker.route}</p>
+                        </div>
+                        <Badge variant="destructive" className="text-[10px] font-bold uppercase animate-pulse">
+                          Retrasado
+                        </Badge>
                       </div>
-                      <Badge variant="destructive" className="text-[10px] font-bold uppercase animate-pulse">
-                        Retrasado
-                      </Badge>
+                      <div className="flex items-center gap-2 mt-1 text-xs">
+                        <Clock className="h-3.5 w-3.5 text-rose-500" />
+                        <span className="text-rose-950 dark:text-rose-300 font-semibold">
+                          Retraso de {worker.delay} minutos
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-xs">
-                      <Clock className="h-3.5 w-3.5 text-rose-500" />
-                      <span className="text-rose-950 dark:text-rose-300 font-semibold">
-                        Retraso de {worker.delay} minutos
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -848,7 +781,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   Todos los quiebres de stock han sido gestionados.
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-2.5">
                   {stockoutAlerts.map((alert) => (
                     <div 
                       key={alert.id}
@@ -910,22 +843,82 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
 
               <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-2 text-xs">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <span className="font-semibold text-muted-foreground">Reponedores en Campo</span>
-                </div>
-                <span className="text-sm font-bold text-foreground">
-                  {reponedores.length}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
-                <div className="flex items-center gap-2 text-xs">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   <span className="font-semibold text-muted-foreground">Reportes de Cierre/Desvíos</span>
                 </div>
                 <span className="text-sm font-bold text-foreground">
                   {kpis.criticalAlerts}
                 </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Clima y Tráfico (Factores Externos) */}
+          <Card className="border-border shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <Car className="h-4.5 w-4.5 text-emerald-600" />
+                  <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                    Factores Externos
+                  </CardTitle>
+                </div>
+                <span className="text-[9px] text-muted-foreground font-semibold">En vivo</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {/* Santa Cruz */}
+              <div className="flex items-center justify-between p-2 bg-muted/20 border border-border/40 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <div className={weatherData.scz.icon === 'sun' ? "p-1 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.scz.icon === 'rain' ? "p-1 bg-blue-500/10 rounded-lg text-blue-500" : "p-1 bg-slate-500/10 rounded-lg text-slate-500"}>
+                    {weatherData.scz.icon === 'sun' ? <Sun className="h-3.5 w-3.5" /> : weatherData.scz.icon === 'rain' ? <CloudRain className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-foreground">Santa Cruz</p>
+                    <p className="text-[9px] text-muted-foreground">{weatherData.scz.temp}°C • {weatherData.scz.text}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-[7px] font-extrabold border-rose-500/30 text-rose-500 bg-rose-500/5 px-1 py-0">
+                    +15m
+                  </Badge>
+                </div>
+              </div>
+
+              {/* La Paz */}
+              <div className="flex items-center justify-between p-2 bg-muted/20 border border-border/40 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <div className={weatherData.lpz.icon === 'sun' ? "p-1 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.lpz.icon === 'rain' ? "p-1 bg-blue-500/10 rounded-lg text-blue-500" : "p-1 bg-slate-500/10 rounded-lg text-slate-500"}>
+                    {weatherData.lpz.icon === 'sun' ? <Sun className="h-3.5 w-3.5" /> : weatherData.lpz.icon === 'rain' ? <CloudRain className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-foreground">La Paz</p>
+                    <p className="text-[9px] text-muted-foreground">{weatherData.lpz.temp}°C • {weatherData.lpz.text}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-[7px] font-extrabold border-amber-500/30 text-amber-600 bg-amber-500/5 px-1 py-0">
+                    +8m
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Cochabamba */}
+              <div className="flex items-center justify-between p-2 bg-muted/20 border border-border/40 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <div className={weatherData.cbb.icon === 'sun' ? "p-1 bg-amber-500/10 rounded-lg text-amber-500" : weatherData.cbb.icon === 'rain' ? "p-1 bg-blue-500/10 rounded-lg text-blue-500" : "p-1 bg-slate-500/10 rounded-lg text-slate-500"}>
+                    {weatherData.cbb.icon === 'sun' ? <Sun className="h-3.5 w-3.5" /> : weatherData.cbb.icon === 'rain' ? <CloudRain className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-foreground">Cochabamba</p>
+                    <p className="text-[9px] text-muted-foreground">{weatherData.cbb.temp}°C • {weatherData.cbb.text}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-[7px] font-extrabold border-emerald-500/30 text-emerald-600 bg-emerald-500/5 px-1 py-0">
+                    OK
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>

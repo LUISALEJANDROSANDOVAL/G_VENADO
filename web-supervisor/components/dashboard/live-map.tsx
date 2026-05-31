@@ -27,6 +27,11 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const selectedWorkerId = propSelectedWorkerId !== undefined ? propSelectedWorkerId : internalSelectedWorkerId
   const setSelectedWorkerId = onSelectWorkerId || setInternalSelectedWorkerId
 
+  const [showPareto, setShowPareto] = useState(true)
+  const [showMayorista, setShowMayorista] = useState(true)
+  const [showDetallista, setShowDetallista] = useState(true)
+  const [showWorkers, setShowWorkers] = useState(true)
+
   // Only show workers who are still actively working
   const activeReponedores = reponedores.filter(w => w.status !== 'Completado')
 
@@ -83,7 +88,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     const markerGroup = L.layerGroup().addTo(map)
 
     // ── Determine which workers & PDVs to render ───────────────────────────────
-    const activeWorkers = selectedWorker ? [selectedWorker] : activeReponedores
+    const activeWorkers = selectedWorker ? [selectedWorker] : (showWorkers ? activeReponedores : [])
     const routeColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6']
 
     // Build a set of PDV IDs that are in the active worker(s) sequences
@@ -103,9 +108,15 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     }
 
     // ── 3. Render PDVs ─────────────────────────────────────────────────────────
-    const pdvsToRender = selectedWorker
+    const pdvsToRender = (selectedWorker
       ? pdvs.filter(p => activePdvIds.has(p.id))
       : pdvs
+    ).filter(p => {
+      if (p.type === 'Pareto' && !showPareto) return false
+      if (p.type === 'Mayorista' && !showMayorista) return false
+      if (p.type === 'Detallista' && !showDetallista) return false
+      return true
+    })
 
     pdvsToRender.forEach((pdv) => {
       const isInRoute = activePdvIds.has(pdv.id)
@@ -205,7 +216,9 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       const allCoords: L.LatLngTuple[] = []
       sequence.forEach((pdvId: string) => {
         const pdv = pdvs.find(p => p.id === pdvId)
-        if (pdv) allCoords.push([pdv.lat, pdv.lng])
+        if (pdv && typeof pdv.lat === 'number' && typeof pdv.lng === 'number' && !isNaN(pdv.lat) && !isNaN(pdv.lng)) {
+          allCoords.push([pdv.lat, pdv.lng])
+        }
       })
 
       if (allCoords.length <= 1) return
@@ -272,6 +285,18 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         }
       }
 
+      // Safe fallback for coordinates if undefined or invalid (e.g. in mock/empty state)
+      if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+        const fallbackPdv = pdvs.find(p => p.id === worker.currentPDV)
+        if (fallbackPdv && typeof fallbackPdv.lat === 'number' && typeof fallbackPdv.lng === 'number' && !isNaN(fallbackPdv.lat) && !isNaN(fallbackPdv.lng)) {
+          lat = fallbackPdv.lat
+          lng = fallbackPdv.lng
+        } else {
+          lat = -34.61
+          lng = -58.44
+        }
+      }
+
       const isDelayed = worker.status === 'Retrasado'
       const workerColor = isDelayed ? '#ef4444' : '#10b981'
 
@@ -307,7 +332,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     }
 
     return () => { markerGroup.remove() }
-  }, [pdvs, reponedores, animationTime, selectedWorkerId])
+  }, [pdvs, reponedores, animationTime, selectedWorkerId, showPareto, showMayorista, showDetallista, showWorkers])
 
   // Build ordered PDV list for selected worker's sidebar detail
   const workerSequencePdvs: Array<PDV & { seqIndex: number }> = selectedWorker
@@ -381,12 +406,12 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
           <div className="bg-slate-100 rounded-lg overflow-hidden relative h-[450px] w-full border border-border">
             <div ref={mapContainerRef} className="h-full w-full z-0" />
 
-            {/* Legend */}
-            <div className="absolute bottom-4 right-4 z-[400] bg-card/95 backdrop-blur-sm border border-border p-3 rounded-lg shadow-lg max-w-[200px] text-xs space-y-2 pointer-events-auto">
-              <h5 className="font-semibold text-foreground/90 border-b border-border pb-1 mb-1.5 uppercase tracking-wider text-[9px]">
-                {selectedWorker ? `Ruta — ${selectedWorker.name}` : 'Categoría Cliente'}
-              </h5>
-              {selectedWorker ? (
+            {/* Legend (Only route legend when worker is focused) */}
+            {selectedWorker && (
+              <div className="absolute bottom-4 right-4 z-[400] bg-card/95 backdrop-blur-sm border border-border p-3 rounded-lg shadow-lg max-w-[200px] text-xs space-y-2 pointer-events-auto">
+                <h5 className="font-semibold text-foreground/90 border-b border-border pb-1 mb-1.5 uppercase tracking-wider text-[9px]">
+                  Ruta — {selectedWorker.name}
+                </h5>
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
@@ -407,29 +432,8 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: '#ef4444' }} />
-                    <span className="text-foreground/80 font-medium">Pareto (Alto Valor)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: '#3b82f6' }} />
-                    <span className="text-foreground/80 font-medium">Mayorista</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: '#9ca3af' }} />
-                    <span className="text-foreground/80 font-medium">Detallista / Minorista</span>
-                  </div>
-                  <div className="border-t border-border pt-1.5 mt-1">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full border border-white bg-emerald-500" />
-                      <span className="text-foreground/80 font-semibold">Reponedor Activo</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Selected worker filter banner */}
             {selectedWorker && (
@@ -444,11 +448,54 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
           </div>
 
           {!selectedWorker && (
-            <div className="mt-4 flex gap-6 text-sm">
-              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-red-500" /><span className="text-foreground/70">PDVs Pareto</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-blue-500" /><span className="text-foreground/70">PDVs Mayoristas</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-gray-400" /><span className="text-foreground/70">PDVs Detallistas</span></div>
-              <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-emerald-500" /><span className="text-foreground/70">Reponedores Activos</span></div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs">
+              <button
+                onClick={() => setShowPareto(!showPareto)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
+                  showPareto
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold shadow-sm'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground opacity-50 hover:opacity-80'
+                }`}
+              >
+                <div className={`h-2.5 w-2.5 rounded-full ${showPareto ? 'bg-rose-500' : 'bg-muted-foreground/50'}`} />
+                PDVs Pareto
+              </button>
+
+              <button
+                onClick={() => setShowMayorista(!showMayorista)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
+                  showMayorista
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 font-bold shadow-sm'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground opacity-50 hover:opacity-80'
+                }`}
+              >
+                <div className={`h-2.5 w-2.5 rounded-full ${showMayorista ? 'bg-blue-500' : 'bg-muted-foreground/50'}`} />
+                PDVs Mayoristas
+              </button>
+
+              <button
+                onClick={() => setShowDetallista(!showDetallista)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
+                  showDetallista
+                    ? 'bg-slate-500/10 border-slate-500/30 text-slate-600 dark:text-slate-400 font-bold shadow-sm'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground opacity-50 hover:opacity-80'
+                }`}
+              >
+                <div className={`h-2.5 w-2.5 rounded-full ${showDetallista ? 'bg-slate-400' : 'bg-muted-foreground/50'}`} />
+                PDVs Detallistas
+              </button>
+
+              <button
+                onClick={() => setShowWorkers(!showWorkers)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
+                  showWorkers
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground opacity-50 hover:opacity-80'
+                }`}
+              >
+                <div className={`h-2.5 w-2.5 rounded-full ${showWorkers ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />
+                Reponedores Activos
+              </button>
             </div>
           )}
         </CardContent>

@@ -24,6 +24,9 @@ export interface Reponedor {
   route: RouteType
   status: WorkerStatus
   currentPDV?: string
+  sequence?: string[]
+  lat?: number
+  lng?: number
   routeProgress: number
   delay: number
   activeOrders: number
@@ -105,13 +108,28 @@ export const generateReponedores = (count: number = 12): Reponedor[] => {
   for (let i = 0; i < count; i++) {
     const status = statuses[Math.floor(Math.random() * statuses.length)]
     const mockId = `REP-${String(i + 1).padStart(3, '0')}`
+    
+    const sequence: string[] = []
+    const sequenceLength = 6 + (i % 3)
+    for (let j = 0; j < sequenceLength; j++) {
+      const pdvIdx = ((i * 8 + j) % 150) + 1
+      sequence.push(`PDV-${String(pdvIdx).padStart(4, '0')}`)
+    }
+
+    const currentPdvId = sequence[Math.floor(Math.random() * sequence.length)]
+    const lat = -34.61 + (i * 0.02)
+    const lng = -58.44 + (i * 0.02)
+
     reponedores.push({
       id: mockId,
       dbUuid: mockId,
       name: names[i % names.length],
       route: ['Urbana', 'Rural', 'Carretera'][i % 3] as RouteType,
       status,
-      currentPDV: `PDV-${String(Math.floor(Math.random() * 100) + 1).padStart(4, '0')}`,
+      currentPDV: currentPdvId,
+      sequence,
+      lat,
+      lng,
       routeProgress: Math.random() * 100,
       delay: status === 'Retrasado' ? Math.floor(Math.random() * 90) + 15 : Math.random() * 15,
       activeOrders: Math.floor(Math.random() * 8) + 1,

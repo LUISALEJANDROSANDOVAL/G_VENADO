@@ -581,10 +581,10 @@ export async function getDashboardData() {
       }))
 
     const pendingRisk = mappedReponedores
-      .filter(r => r.status === 'Retrasado' || r.status === 'En Trayecto')
+      .filter(r => (r.status === 'Retrasado' || r.status === 'En Trayecto') && r.currentPDV)
       .slice(0, 3)
       .map((r, i) => {
-        const pdvId = r.currentPDV || 'PDV-0001'
+        const pdvId = r.currentPDV!
         const pdv = mappedPdvs.find(p => p.id === pdvId)
         return {
           id: pdvId,

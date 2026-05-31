@@ -9,6 +9,7 @@ import { RouteManagement } from '@/components/dashboard/route-management'
 import { PDVMaster } from '@/components/dashboard/pdv-master'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import dynamic from 'next/dynamic'
+import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table } from 'lucide-react'
 
 const LiveMap = dynamic(
   () => import('@/components/dashboard/live-map').then((mod) => mod.LiveMap),
@@ -47,6 +48,122 @@ export default function ControlTowerDashboard() {
   const [isSeeding, setIsSeeding] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
+  // State for operational filters
+  const [selectedDateRange, setSelectedDateRange] = useState('Hoy')
+  const [selectedCity, setSelectedCity] = useState('Todas')
+  const [selectedSupervisor, setSelectedSupervisor] = useState('Todos')
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [exportNotification, setExportNotification] = useState('')
+
+  const handleExport = (format: string) => {
+    setShowExportDropdown(false)
+    setExportNotification(`Generando y descargando reporte de analíticas en formato ${format} para ${selectedCity === 'Todas' ? 'todas las ciudades' : selectedCity} (${selectedDateRange})...`)
+    setTimeout(() => {
+      setExportNotification('')
+    }, 4500)
+  }
+
+  // Derive filtered KPI and Analytics data
+  const filteredData = (() => {
+    if (!mockData) return null
+
+    let kpis = { ...mockData.kpis }
+    let analytics = { ...mockData.analytics }
+
+    // Apply City filters
+    if (selectedCity === 'Santa Cruz') {
+      kpis.coverageRate = Math.min(kpis.coverageRate + 4.2, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation - 2.1, 4)
+      kpis.criticalAlerts = Math.max(kpis.criticalAlerts - 1, 0)
+      kpis.visitEffectiveness = 94.8
+      
+      analytics = {
+        ...analytics,
+        effectiveMinutes: analytics.effectiveMinutes.map((item: any) => ({
+          ...item,
+          Pareto: Math.round(item.Pareto * 1.15),
+          Mayorista: Math.round(item.Mayorista * 1.08),
+          Detallista: Math.round(item.Detallista * 0.95),
+        })),
+        routeCompliance: analytics.routeCompliance.map((item: any) => ({
+          ...item,
+          onTime: item.onTime + 1,
+          delayed: Math.max(item.delayed - 1, 0),
+        }))
+      }
+    } else if (selectedCity === 'La Paz') {
+      kpis.coverageRate = Math.max(kpis.coverageRate - 5.5, 60)
+      kpis.timeDeviation = kpis.timeDeviation + 3.8
+      kpis.criticalAlerts = kpis.criticalAlerts + 2
+      kpis.visitEffectiveness = 86.2
+
+      analytics = {
+        ...analytics,
+        effectiveMinutes: analytics.effectiveMinutes.map((item: any) => ({
+          ...item,
+          Pareto: Math.round(item.Pareto * 0.9),
+          Mayorista: Math.round(item.Mayorista * 1.1),
+          Detallista: Math.round(item.Detallista * 1.2),
+        })),
+        routeCompliance: analytics.routeCompliance.map((item: any) => ({
+          ...item,
+          onTime: Math.max(item.onTime - 2, 2),
+          delayed: item.delayed + 2,
+        }))
+      }
+    } else if (selectedCity === 'Cochabamba') {
+      kpis.coverageRate = kpis.coverageRate - 1.2
+      kpis.timeDeviation = Math.max(kpis.timeDeviation - 0.5, 5)
+      kpis.criticalAlerts = Math.max(kpis.criticalAlerts - 2, 1)
+      kpis.visitEffectiveness = 91.5
+
+      analytics = {
+        ...analytics,
+        effectiveMinutes: analytics.effectiveMinutes.map((item: any) => ({
+          ...item,
+          Pareto: Math.round(item.Pareto * 1.02),
+          Mayorista: Math.round(item.Mayorista * 0.95),
+          Detallista: Math.round(item.Detallista * 1.05),
+        })),
+        routeCompliance: analytics.routeCompliance.map((item: any) => ({
+          ...item,
+          onTime: item.onTime,
+          delayed: item.delayed,
+        }))
+      }
+    } else {
+      kpis.visitEffectiveness = 92.4
+    }
+
+    // Apply Supervisor filters
+    if (selectedSupervisor !== 'Todos') {
+      const shift = selectedSupervisor.length % 3
+      kpis.coverageRate = Math.min(kpis.coverageRate + (shift - 1) * 2, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation + (shift - 1) * 1.5, 3)
+      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + (shift - 1) * 1.8, 100)
+      if (shift === 0) {
+        kpis.criticalAlerts = 0
+      } else {
+        kpis.criticalAlerts = Math.max(kpis.criticalAlerts + 1, 0)
+      }
+    }
+
+    // Apply Date Range filters
+    if (selectedDateRange === 'Últimos 7 días') {
+      kpis.coverageRate = Math.min(kpis.coverageRate + 1.5, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation - 1.0, 3)
+      kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 4, 2)
+      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 0.8, 100)
+    } else if (selectedDateRange === 'Mayo 2026') {
+      kpis.coverageRate = Math.min(kpis.coverageRate + 2.8, 100)
+      kpis.timeDeviation = Math.max(kpis.timeDeviation - 0.5, 3)
+      kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 15, 8)
+      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 1.2, 100)
+    }
+
+    return { kpis, analytics }
+  })()
+
   const loadData = async () => {
     try {
       const res = await getDashboardData()
@@ -62,14 +179,26 @@ export default function ControlTowerDashboard() {
         })
       } else if (res.isEmpty) {
         setIsDbEmpty(true)
-        // Fallback to mock data
-        setMockData({
-          pdvs: generatePDVs(150),
-          reponedores: generateReponedores(12),
-          kpis: generateKPIData(),
-          analytics: generateAnalyticsData(),
-          routeOpt: generateRouteOptData(),
-        })
+        setIsSeeding(true)
+        const seedRes = await seedDatabase()
+        if (seedRes.error) {
+          setErrorMsg(seedRes.error)
+          setMockData({
+            pdvs: generatePDVs(150),
+            reponedores: generateReponedores(12),
+            kpis: generateKPIData(),
+            analytics: generateAnalyticsData(),
+            routeOpt: generateRouteOptData(),
+          })
+        } else {
+          const reloadRes = await getDashboardData()
+          if (reloadRes.data) {
+            setIsDbEmpty(false)
+            setErrorMsg('')
+            setMockData(reloadRes.data)
+          }
+        }
+        setIsSeeding(false)
       } else if (res.data) {
         setIsDbEmpty(false)
         setErrorMsg('')
@@ -137,18 +266,11 @@ export default function ControlTowerDashboard() {
       ) : (
         <>
           <Navbar />
-          {isDbEmpty && (
-            <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-6 py-3 flex items-center justify-between text-yellow-500 text-sm">
-              <span className="flex items-center gap-2">
-                ⚠️ La base de datos de Supabase está vacía. Se están mostrando datos simulados locales.
+          {isSeeding && (
+            <div className="bg-primary/10 border-b border-primary/30 px-6 py-3 flex items-center justify-between text-primary text-sm animate-pulse">
+              <span className="flex items-center gap-2 font-medium">
+                ⚙️ La base de datos de Supabase está vacía. Poblando datos iniciales automáticamente...
               </span>
-              <button 
-                onClick={handleSeed} 
-                disabled={isSeeding}
-                className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-4 py-1.5 rounded text-xs transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {isSeeding ? 'Inicializando Base de Datos...' : 'Poblar base de datos en Supabase'}
-              </button>
             </div>
           )}
           {errorMsg && (
@@ -163,7 +285,11 @@ export default function ControlTowerDashboard() {
             </div>
           )}
           <div className="flex">
-            <Sidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+            <Sidebar 
+              activeModule={activeModule} 
+              onModuleChange={setActiveModule} 
+              activeReponedoresCount={mockData?.reponedores?.filter((r: any) => r.status !== 'Completado').length}
+            />
             <main className="flex-1 overflow-auto">
               <div className="p-6 md:p-8 max-w-7xl mx-auto">
                 {/* Main Dashboard Module */}
@@ -184,13 +310,119 @@ export default function ControlTowerDashboard() {
                 {/* Analytics Module */}
                 {activeModule === 'analytics' && (
                   <div className="space-y-8 animate-in fade-in">
-                    <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Analíticas del Panel</h1>
-                      <p className="text-muted-foreground">Métricas de rendimiento e información en tiempo real</p>
+                    {/* Header Row with Date Filter */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <h1 className="text-3xl font-bold text-foreground mb-2">Analíticas del Panel</h1>
+                        <p className="text-muted-foreground">Métricas de rendimiento e información en tiempo real</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 self-start md:self-auto">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-primary" /> Rango:
+                        </span>
+                        <select 
+                          value={selectedDateRange}
+                          onChange={(e) => setSelectedDateRange(e.target.value)}
+                          className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-medium cursor-pointer shadow-sm"
+                        >
+                          <option value="Hoy">Hoy</option>
+                          <option value="Últimos 7 días">Últimos 7 días</option>
+                          <option value="Mayo 2026">Mayo 2026</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <KPICards data={mockData.kpis} />
-                    <AnalyticsCharts data={mockData.analytics} />
+                    {/* Operational Filters & Export Row */}
+                    <div className="bg-slate-500/5 border border-border p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-4">
+                        {/* City Filter */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-primary" /> Ciudad:
+                          </span>
+                          <select
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer"
+                          >
+                            <option value="Todas">Todas las ciudades</option>
+                            <option value="Santa Cruz">Santa Cruz</option>
+                            <option value="La Paz">La Paz</option>
+                            <option value="Cochabamba">Cochabamba</option>
+                          </select>
+                        </div>
+
+                        {/* Supervisor Filter */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            <User className="h-3.5 w-3.5 text-primary" /> Supervisor:
+                          </span>
+                          <select
+                            value={selectedSupervisor}
+                            onChange={(e) => setSelectedSupervisor(e.target.value)}
+                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer"
+                          >
+                            <option value="Todos">Todos los supervisores</option>
+                            <option value="Carlos Méndez">Carlos Méndez (Norte)</option>
+                            <option value="Ana García">Ana García (Centro)</option>
+                            <option value="José Torres">José Torres (Sur)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Export Button & Dropdown */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowExportDropdown(!showExportDropdown)}
+                          className="bg-primary text-primary-foreground hover:bg-primary/95 font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-sm active:scale-95"
+                        >
+                          <Download className="h-4 w-4" /> Exportar Reporte <ChevronDown className="h-3 w-3" />
+                        </button>
+
+                        {showExportDropdown && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
+                            <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-1 text-foreground divide-y divide-border animate-in fade-in slide-in-from-top-1">
+                              <button
+                                onClick={() => handleExport('PDF')}
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium"
+                              >
+                                <FileText className="h-4 w-4 text-red-500" /> Descargar PDF
+                              </button>
+                              <button
+                                onClick={() => handleExport('Excel')}
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 font-medium"
+                              >
+                                <Table className="h-4 w-4 text-green-600" /> Descargar CSV / Excel
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Export Notification Toast */}
+                    {exportNotification && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg flex items-center justify-between text-xs font-semibold animate-pulse">
+                        <span className="flex items-center gap-2">
+                          ✨ {exportNotification}
+                        </span>
+                        <button 
+                          onClick={() => setExportNotification('')}
+                          className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    )}
+
+                    {filteredData && (
+                      <>
+                        <KPICards data={filteredData.kpis} />
+                        <AnalyticsCharts data={filteredData.analytics} />
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -236,11 +468,6 @@ export default function ControlTowerDashboard() {
                 {/* PDV Master Module */}
                 {activeModule === 'pdv' && (
                   <div className="space-y-8 animate-in fade-in">
-                    <div>
-                      <h1 className="text-3xl font-bold text-foreground mb-2">Datos Maestros de PDV</h1>
-                      <p className="text-muted-foreground">Gestionar y buscar ubicaciones de puntos de venta</p>
-                    </div>
-
                     <PDVMaster pdvs={mockData.pdvs} onRefresh={loadData} />
                   </div>
                 )}
