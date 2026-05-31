@@ -32,6 +32,8 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
   // Avoid SSR hydration mismatch
   useEffect(() => {
     setMounted(true)
@@ -132,16 +134,48 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
         <Button 
           variant="ghost" 
           className="w-full justify-start gap-3 bg-white/10 hover:bg-white/20 text-white rounded-xl py-2.5 px-4 font-bold border-none transition-all active:scale-98 cursor-pointer text-xs"
-          onClick={() => {
-            if (confirm('¿Desea cerrar la sesión de supervisión?')) {
-              console.log('Logging out...')
-            }
-          }}
+          onClick={() => setShowLogoutConfirm(true)}
         >
           <LogOut className="h-4 w-4" />
           <span>Cerrar Sesión</span>
         </Button>
       </div>
+
+      {/* Custom Logout Confirmation Dialog */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card text-card-foreground border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-rose-500/10 text-rose-500 rounded-full shrink-0">
+                <LogOut className="h-6 w-6" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-sm font-bold text-foreground">¿Cerrar Sesión?</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">¿Desea cerrar la sesión de supervisión?</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowLogoutConfirm(false)}
+                className="h-9 px-4 rounded-xl text-xs font-semibold text-foreground border-border hover:bg-muted transition-all"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => {
+                  localStorage.removeItem('supervisor_session')
+                  window.location.reload()
+                }}
+                className="h-9 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-sm border-none cursor-pointer"
+              >
+                Aceptar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </aside>
   )

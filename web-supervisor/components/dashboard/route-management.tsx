@@ -581,7 +581,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
     const pdvCount = w.sequence ? w.sequence.length : 8
     const score = (daySeed + nameLength) % 3
-    const status = score === 0 ? 'En Proceso' : score === 1 ? 'Asignada' : 'Completada'
+    const status: 'Completada' | 'En Proceso' | 'Asignada' = score === 0 ? 'En Proceso' : score === 1 ? 'Asignada' : 'Completada'
 
     const completedCount = status === 'Completada'
       ? pdvCount
@@ -1194,7 +1194,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                       </h4>
                       
                       <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
-                        {tomorrowSequence.map((pdvId, idx) => {
+                        {tomorrowSequence.map((pdvId: string, idx: number) => {
                           const pdv = pdvs.find(p => p.id === pdvId)
                           const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
                           const isLast = idx === tomorrowSequence.length - 1
