@@ -7,11 +7,15 @@ import 'views/login_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Carga plantilla incluida en assets; en producción usar .env local con credenciales reales
+  // Carga variables de entorno (.env real o .env.example como fallback)
   try {
-    await dotenv.load(fileName: '.env.example');
+    await dotenv.load(fileName: '.env');
   } catch (e) {
-    debugPrint('Variables de entorno no cargadas (modo mock UI): $e');
+    try {
+      await dotenv.load(fileName: '.env.example');
+    } catch (e2) {
+      debugPrint('Variables de entorno no cargadas (modo mock UI): $e2');
+    }
   }
 
   // TODO: Supabase se inicializará cuando se integre auth y sync real

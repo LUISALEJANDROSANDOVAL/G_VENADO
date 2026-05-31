@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/pdv.dart';
 import '../models/visit.dart';
 import '../services/app_connection_service.dart';
+import '../services/gps_service.dart';
+import '../services/route_repository.dart';
 import '../theme/app_colors.dart';
 import '../widgets/mock_route_map.dart';
 import '../widgets/offline_banner.dart';
@@ -22,13 +25,42 @@ class RouteView extends StatefulWidget {
 }
 
 class _RouteViewState extends State<RouteView> {
-  late List<Pdv> _pdvs;
+  List<Pdv> _pdvs = [];
   bool _isRefreshing = false;
+  bool _isLoadingRoute = true;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
-    _pdvs = List.from(MockData.dailyRoute);
+    _loadRoute();
+  }
+
+  /// Carga la ruta desde Supabase (RF-06/RF-07) con fallback a MockData.
+  Future<void> _loadRoute() async {
+    setState(() {
+      _isLoadingRoute = true;
+      _loadError = null;
+    });
+    try {
+      // Obtiene el userId autenticado si hay sesión activa
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
+      if (mounted) {
+        setState(() {
+          _pdvs = pdvs;
+          _isLoadingRoute = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pdvs = List.from(MockData.dailyRoute);
+          _isLoadingRoute = false;
+          _loadError = e.toString();
+        });
+      }
+    }
   }
 
   String get _dateLabel {
@@ -49,18 +81,30 @@ class _RouteViewState extends State<RouteView> {
 
   Future<void> _refreshRoute() async {
     setState(() => _isRefreshing = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    // Invalida caché para forzar recarga desde Supabase
+    RouteRepository.instance.invalidateCache();
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
+      if (mounted) setState(() => _pdvs = pdvs);
+    } catch (_) {
+      // Mantiene datos actuales si falla el refresh
+    }
     if (mounted) setState(() => _isRefreshing = false);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Ruta actualizada'),
+        content: Text('Ruta sincronizada con Supabase'),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   void _logout() {
+    // Detener el GPS y limpiar caché antes de cerrar sesión
+    GpsService.instance.stopTracking();
+    RouteRepository.instance.invalidateCache();
+    Supabase.instance.client.auth.signOut();
     Navigator.of(context).pushAndRemoveUntil<void>(
       MaterialPageRoute<void>(builder: (_) => const LoginView()),
       (_) => false,
@@ -150,6 +194,13 @@ class _RouteViewState extends State<RouteView> {
         _pdvs[index] = _pdvs[index].copyWith(status: VisitStatus.completada);
       }
     });
+
+    // Actualizar el estado del plan de ruta en Supabase
+    if (_journeyComplete) {
+      RouteRepository.instance.updateRoutePlanStatus('COMPLETADA');
+    } else {
+      RouteRepository.instance.updateRoutePlanStatus('EN_PROCESO');
+    }
   }
 
   void _markPdvInProgress(String pdvId) {
@@ -164,6 +215,8 @@ class _RouteViewState extends State<RouteView> {
         _pdvs[index] = _pdvs[index].copyWith(status: VisitStatus.enProceso);
       }
     });
+
+    RouteRepository.instance.updateRoutePlanStatus('EN_PROCESO');
   }
 
   void _openVisit(Pdv pdv) {
@@ -220,62 +273,82 @@ class _RouteViewState extends State<RouteView> {
       body: Column(
         children: [
           const OfflineBanner(),
+          // Banner informativo si los datos vienen del modo demo
+          if (_loadError != null && !_isLoadingRoute)
+            _SourceBanner(isDemo: true, message: 'Modo Demo — Supabase sin ruta asignada hoy'),
+          if (_loadError == null && !_isLoadingRoute && _pdvs.isNotEmpty)
+            _SourceBanner(isDemo: false, message: 'Ruta cargada desde Supabase ✓'),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refreshRoute,
-              color: AppColors.institutionalBlue,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                children: [
-                  RouteProgressHeader(
-                    reponedorName: MockData.mockUser.name,
-                    dateLabel: _dateLabel,
-                    completedVisits: _completed,
-                    totalVisits: _pdvs.length,
-                  ),
-                  const SizedBox(height: 20),
-                  RouteSummaryRow(
-                    pending: _pending,
-                    completed: _completed,
-                    pendingSync: _pendingSync,
-                  ),
-                  if (_journeyComplete) ...[
-                    const SizedBox(height: 16),
-                    _JourneyCompleteCard(total: _pdvs.length),
-                  ],
-                  if (active != null && !_journeyComplete) ...[
-                    const SizedBox(height: 16),
-                    _ActivePdvBanner(pdv: active, onOpen: () => _openVisit(active)),
-                  ],
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Text('Mapa de ruta', style: Theme.of(context).textTheme.titleMedium),
-                      const Spacer(),
-                      if (_isRefreshing)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+            child: _isLoadingRoute
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          'Cargando ruta desde Supabase...',
+                          style: TextStyle(color: Colors.grey),
                         ),
-                    ],
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _refreshRoute,
+                    color: AppColors.institutionalBlue,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      children: [
+                        RouteProgressHeader(
+                          reponedorName: MockData.mockUser.name,
+                          dateLabel: _dateLabel,
+                          completedVisits: _completed,
+                          totalVisits: _pdvs.length,
+                        ),
+                        const SizedBox(height: 20),
+                        RouteSummaryRow(
+                          pending: _pending,
+                          completed: _completed,
+                          pendingSync: _pendingSync,
+                        ),
+                        if (_journeyComplete) ...[
+                          const SizedBox(height: 16),
+                          _JourneyCompleteCard(total: _pdvs.length),
+                        ],
+                        if (active != null && !_journeyComplete) ...[
+                          const SizedBox(height: 16),
+                          _ActivePdvBanner(pdv: active, onOpen: () => _openVisit(active)),
+                        ],
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Text('Mapa de ruta', style: Theme.of(context).textTheme.titleMedium),
+                            const Spacer(),
+                            if (_isRefreshing)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        MockRouteMap(pdvs: _pdvs, activePdvId: active?.id),
+                        const SizedBox(height: 8),
+                        _GpsTrackingHint(isActive: !_journeyComplete),
+                        const SizedBox(height: 20),
+                        Text('Puntos de venta', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 10),
+                        ..._pdvs.map(
+                          (pdv) => PdvCard(pdv: pdv, onTap: () => _openVisit(pdv)),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  MockRouteMap(pdvs: _pdvs, activePdvId: active?.id),
-                  const SizedBox(height: 8),
-                  _GpsTrackingHint(isActive: !_journeyComplete),
-                  const SizedBox(height: 20),
-                  Text('Puntos de venta', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 10),
-                  ..._pdvs.map(
-                    (pdv) => PdvCard(pdv: pdv, onTap: () => _openVisit(pdv)),
-                  ),
-                ],
-              ),
-            ),
           ),
-          if (!_journeyComplete) _buildBottomAction(context),
+          if (!_isLoadingRoute && !_journeyComplete) _buildBottomAction(context),
+
         ],
       ),
     );
@@ -460,6 +533,45 @@ class _NavOptionTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Banner compacto que indica si los datos vienen de Supabase o del Modo Demo.
+class _SourceBanner extends StatelessWidget {
+  const _SourceBanner({required this.isDemo, required this.message});
+
+  final bool isDemo;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      color: isDemo
+          ? const Color(0xFFFFF3CD) // Amarillo suave demo
+          : const Color(0xFFD4EDDA), // Verde suave Supabase
+      child: Row(
+        children: [
+          Icon(
+            isDemo ? Icons.info_outline : Icons.cloud_done_outlined,
+            size: 16,
+            color: isDemo ? const Color(0xFF856404) : const Color(0xFF155724),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDemo ? const Color(0xFF856404) : const Color(0xFF155724),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

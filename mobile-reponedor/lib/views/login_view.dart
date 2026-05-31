@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../services/app_connection_service.dart';
+import '../services/gps_service.dart';
+import '../services/supabase_service.dart';
 import '../theme/trace_login_colors.dart';
 import '../widgets/connection_status_indicator.dart';
 import '../widgets/trace_logo.dart';
@@ -49,14 +54,81 @@ class _LoginViewState extends State<LoginView> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    final username = _userController.text.trim();
+    final password = _passwordController.text;
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    // Plan de contingencia / Modo Demostración Offline
+    if (username == MockData.mockUser.username && password == 'demo1234') {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const RouteView()),
-    );
+      // Intentar GPS aunque sea demo (no bloquea el login si falla)
+      unawaited(GpsService.instance.startLiveTracking());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Iniciando sesión en Modo Demostración (Local Offline)'),
+          backgroundColor: Colors.blueGrey,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const RouteView()),
+      );
+      return;
+    }
+
+    // Autenticación Real con Supabase Auth
+    try {
+      final response = await SupabaseService.client.auth.signInWithPassword(
+        email: username,
+        password: password,
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (response.user != null) {
+        // Iniciar rastreo GPS al autenticarse con Supabase
+        unawaited(GpsService.instance.startLiveTracking());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesión iniciada con éxito en Supabase'),
+            backgroundColor: Color(0xFF0F8C56), // Verde TRACE V
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const RouteView()),
+        );
+      } else {
+        throw Exception('No se pudo recuperar los datos del usuario autenticado.');
+      }
+    } on AuthException catch (authErr) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error de autenticación: ${authErr.message}'),
+          backgroundColor: const Color(0xFFAA001B), // Rojo TRACE V
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al conectar con Supabase: $e'),
+          backgroundColor: const Color(0xFFAA001B), // Rojo TRACE V
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
