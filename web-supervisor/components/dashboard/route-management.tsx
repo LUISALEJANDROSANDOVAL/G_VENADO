@@ -648,11 +648,13 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
   const handleReassignTomorrow = async (pdvId: string, targetReponedorId: string) => {
     let currentReponedorId = ''
-    tomorrowPlans.forEach(p => {
-      if (p.sequence.includes(pdvId)) {
-        currentReponedorId = p.reponedorId
-      }
-    })
+    if (tomorrowPlans) {
+      tomorrowPlans.forEach(p => {
+        if (p.sequence.includes(pdvId)) {
+          currentReponedorId = p.reponedorId
+        }
+      })
+    }
 
     if (tomorrowPublished) {
       setIsReassigning(true)
@@ -673,7 +675,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         let seq = p.sequence
         if (p.reponedorId === currentReponedorId) {
           seq = seq.filter((id: string) => id !== pdvId)
@@ -684,7 +686,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
           }
         }
         return { ...p, sequence: seq }
-      }))
+      }) : null)
     }
   }
 
@@ -707,12 +709,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         if (p.reponedorId === reponedorId) {
           return { ...p, sequence: p.sequence.filter((id: string) => id !== pdvId) }
         }
         return p
-      }))
+      }) : null)
     }
   }
 
@@ -735,14 +737,14 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         if (p.reponedorId === reponedorId) {
           if (!p.sequence.includes(pdvId)) {
             return { ...p, sequence: [...p.sequence, pdvId] }
           }
         }
         return p
-      }))
+      }) : null)
     }
   }
 
