@@ -62,27 +62,22 @@ export function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div className="login-theme min-h-screen bg-background font-body-md text-on-background flex w-full">
       <main className="flex min-h-screen w-full">
-        {/* Left Side: Visual/Brand (Immutable identity from JSON logic) */}
-        <section className="hidden lg:flex lg:w-1/2 relative bg-on-background flex-col justify-between overflow-hidden">
+        {/* Left Side: Visual/Brand */}
+        <section className="hidden lg:flex lg:w-1/2 relative bg-[#092140] flex-col justify-between overflow-hidden">
           {/* Background Image with Overlay */}
           <div className="absolute inset-0 z-0">
             <img 
               alt="Operaciones Logísticas" 
-              className="w-full h-full object-cover opacity-40 grayscale" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBu1V8asSlMVz8anwKKiGPGgIsiZqYVn17lFEGCw0-ZMJbDrFZoxlBookRB-Ll1IaV62pygJRKfvTJ8-fnL95W3n1zCK6ds-oLRw4JgJqPl-uoMP6mYxa0B0ExdNm2FS8tPFx21sY6-ZCOIlnCepoCDaIkmXQsQf8N91zgwYS-GKyjH0BcVdx33WeP9jhRX9FuQ07ZSMsPDz-oeoXVLLnpepH5Uy5uf-TtzU2vW_pRj54kuZD4ry3jRf4v4Dd9LHjaDEvOHKtnwbQk"
+              className="w-full h-full object-cover" 
+              src="/bg_login.jpg"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-on-background via-on-background/60 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#092140]/60 via-[#092140]/20 to-transparent"></div>
           </div>
           <div className="relative z-10 p-margin-page flex flex-col h-full bg-pattern">
             {/* Branding Header */}
             <div className="flex items-center gap-stack-gap">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <span 
-                  className="material-symbols-outlined text-on-primary text-[32px]" 
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  monitoring
-                </span>
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2 shadow-md shrink-0">
+                <img src="/logo.png" alt="Grupo Venado Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="font-headline-lg text-headline-lg text-surface-bright leading-none">Torre de Control</h1>
@@ -119,13 +114,8 @@ export function Login({ onLoginSuccess }: LoginProps) {
           >
             {/* Mobile Branding (Only visible on small screens) */}
             <div className="flex lg:hidden items-center gap-3 mb-10">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <span 
-                  className="material-symbols-outlined text-on-primary text-[24px]" 
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  monitoring
-                </span>
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-md shrink-0">
+                <img src="/logo.png" alt="Grupo Venado Logo" className="w-full h-full object-contain" />
               </div>
               <h1 className="font-headline-md text-headline-md text-on-surface">Torre de Control</h1>
             </div>

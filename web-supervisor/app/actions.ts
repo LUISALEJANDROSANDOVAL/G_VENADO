@@ -1010,7 +1010,7 @@ export async function getTomorrowRoutesPlan() {
     if (numWorkers === 0) return { published: false, plans: [] }
 
     // Initialize centroids by choosing well-spaced out PDVs from the pool
-    const centroids = []
+    const centroids: { lat: number; lng: number }[] = []
     for (let i = 0; i < numWorkers; i++) {
       const idx = Math.min(pdvPool.length - 1, Math.floor((i * pdvPool.length) / numWorkers))
       centroids.push({
