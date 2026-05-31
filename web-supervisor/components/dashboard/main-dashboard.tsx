@@ -448,8 +448,8 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
           <Card className="border-border shadow-sm">
             <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-sm font-bold">Avance de Auditoría por Canal</CardTitle>
-                <CardDescription className="text-[10px] hidden sm:block">Porcentaje de visitas completadas por segmentación Venado</CardDescription>
+                <CardTitle className="text-sm font-bold">Avance de Visitas por Tipo de Tienda</CardTitle>
+                <CardDescription className="text-[10px] hidden sm:block">Porcentaje de visitas completadas según el tipo de cliente</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
@@ -457,7 +457,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Pareto */}
                 <div className="space-y-1 bg-blue-500/5 p-2 rounded-xl border border-blue-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">PARETO (Estratégico)</span>
+                    <span className="truncate">Clientes Clave (Pareto)</span>
                     <span>{Math.round(paretoPct)}%</span>
                   </div>
                   <Progress value={paretoPct} className="h-1 bg-blue-200" />
@@ -467,7 +467,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Mayorista */}
                 <div className="space-y-1 bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">MAYORISTA</span>
+                    <span className="truncate">Clientes Mayoristas</span>
                     <span>{Math.round(mayoristaPct)}%</span>
                   </div>
                   <Progress value={mayoristaPct} className="h-1 bg-emerald-200" />
@@ -477,7 +477,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Detallista */}
                 <div className="space-y-1 bg-amber-500/5 p-2 rounded-xl border border-amber-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">DETALLISTA / MINORISTA</span>
+                    <span className="truncate">Tiendas / Minoristas</span>
                     <span>{Math.round(detallistaPct)}%</span>
                   </div>
                   <Progress value={detallistaPct} className="h-1 bg-amber-200" />
@@ -492,10 +492,10 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             <CardHeader className="p-3 pb-1">
               <div className="flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
-                <CardTitle className="text-sm font-bold">Progreso de la Jornada (Curva S)</CardTitle>
+                <CardTitle className="text-sm font-bold">Progreso de Visitas (Planificado vs Real)</CardTitle>
               </div>
               <CardDescription className="text-[10px]">
-                Visitas completadas (Real vs Planificado)
+                Comparación entre el avance planificado y las visitas completadas reales
               </CardDescription>
             </CardHeader>
             <CardContent className="p-3 pt-0">
@@ -595,7 +595,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white text-[10px] font-bold py-1 px-2 rounded-xl flex items-center justify-center gap-1 shadow-xs transition-all duration-200 cursor-pointer h-8"
                 >
                   <Bell className="h-3 w-3 shrink-0" />
-                  Notificar ({delayedWorkers.length})
+                  Avisar Retrasos ({delayedWorkers.length})
                 </Button>
 
                 {/* Declarar bloqueo de vías */}
@@ -612,7 +612,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   ].join(" ")}
                 >
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  {isBlockadeDeclared ? "Bloqueo ON" : "Bloqueo de vías"}
+                  {isBlockadeDeclared ? "Bloqueo Activo" : "Reportar Bloqueo"}
                 </Button>
               </div>
 
@@ -632,7 +632,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider">Alertas Activas ({delayedWorkers.length})</CardTitle>
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider">Reponedores con Retraso ({delayedWorkers.length})</CardTitle>
                 </div>
               </div>
             </CardHeader>
@@ -640,7 +640,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               {delayedWorkers.length === 0 ? (
                 <div className="py-4 text-center text-muted-foreground text-[10px] flex flex-col items-center gap-1">
                   <CheckCircle className="h-6 w-6 text-emerald-500" />
-                  Sin alertas críticas registradas hoy.
+                  Todos los reponedores van al día hoy.
                 </div>
               ) : (
                 <div className="max-h-[140px] overflow-y-auto pr-1 space-y-1.5">
@@ -656,13 +656,13 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                           <p className="text-[9px] text-muted-foreground">Ruta: {worker.route}</p>
                         </div>
                         <Badge variant="destructive" className="text-[8px] font-bold uppercase py-0 px-1 animate-pulse shrink-0 scale-90">
-                          Retraso
+                          Atrasado
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-400">
                         <Clock className="h-3 w-3 shrink-0" />
                         <span className="font-semibold">
-                          Retraso de {worker.delay} min.
+                          Atrasado por {worker.delay} min.
                         </span>
                       </div>
                     </div>
@@ -677,14 +677,14 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
           {/* Quick Stats Summary */}
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Resumen de la Jornada</CardTitle>
-              <CardDescription>Datos clave agregados hoy</CardDescription>
+              <CardTitle className="text-lg font-bold">Resumen del Día</CardTitle>
+              <CardDescription>Datos clave acumulados hoy</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-2 text-xs">
                   <CheckSquare className="h-4 w-4 text-emerald-500" />
-                  <span className="font-semibold text-muted-foreground">Puntos de Venta Visitados</span>
+                  <span className="font-semibold text-muted-foreground">Tiendas Visitadas</span>
                 </div>
                 <span className="text-sm font-bold text-foreground">
                   {pdvs.filter(p => p.visited).length} / {pdvs.length}
@@ -694,7 +694,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-2 text-xs">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <span className="font-semibold text-muted-foreground">Reportes de Cierre/Desvíos</span>
+                  <span className="font-semibold text-muted-foreground">Alertas de Desvíos</span>
                 </div>
                 <span className="text-sm font-bold text-foreground">
                   {kpis.criticalAlerts}
@@ -710,10 +710,10 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 <div className="flex items-center gap-2">
                   <Car className="h-4.5 w-4.5 text-emerald-600" />
                   <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                    Factores Externos
+                    Clima y Tránsito por Ciudad
                   </CardTitle>
                 </div>
-                <span className="text-[9px] text-muted-foreground font-semibold">En vivo</span>
+                <span className="text-[9px] text-muted-foreground font-semibold">Actualizado</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-2.5">

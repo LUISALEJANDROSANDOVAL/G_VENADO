@@ -41,10 +41,10 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
 
   const modules = [
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { id: 'map', label: 'Seguimiento en Vivo', icon: Map },
-    { id: 'routes', label: 'Rutas & Historial', icon: Route },
-    { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
-    { id: 'pdv', label: 'Maestro de PDVs', icon: Database },
+    { id: 'map', label: 'Mapa en Vivo', icon: Map },
+    { id: 'routes', label: 'Control de Rutas', icon: Route },
+    { id: 'analytics', label: 'Reportes y Gráficos', icon: BarChart3 },
+    { id: 'pdv', label: 'Directorio de Tiendas', icon: Database },
   ]
 
   const isDark = mounted ? (theme === 'dark' || resolvedTheme === 'dark') : false
