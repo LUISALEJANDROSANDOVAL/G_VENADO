@@ -840,21 +840,20 @@ export async function uploadPdvs(pdvsList: any[]) {
   }
 }
 
-export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
-  console.log(`Reassigning PDV ${pdvId} to worker ${targetReponedorUuid}...`)
+export async function reassignPdv(pdvId: string, targetReponedorUuid: string, dateStr?: string) {
+  const planDate = dateStr || new Date().toISOString().split('T')[0]
+  console.log(`Reassigning PDV ${pdvId} to worker ${targetReponedorUuid} on date ${planDate}...`)
   try {
-    const todayStr = new Date().toISOString().split('T')[0]
-
-    // 1. Find the plan that currently contains this PDV today
+    // 1. Find the plan that currently contains this PDV on this date
     const { data: plans, error: fetchErr } = await supabaseAdmin
       .from('daily_routes_plan')
       .select('*')
-      .eq('date', todayStr)
+      .eq('date', planDate)
 
     if (fetchErr) throw new Error(fetchErr.message)
-    if (!plans || plans.length === 0) throw new Error('No active route plans for today.')
-
-    const sourcePlan = plans.find(p => p.optimized_pos_sequence.includes(pdvId))
+    
+    // Fallback: If no plans exist on this date, we just skip removing from source
+    const sourcePlan = plans ? plans.find(p => p.optimized_pos_sequence.includes(pdvId)) : null
     
     if (sourcePlan) {
       // Remove from source plan
@@ -868,7 +867,7 @@ export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
     }
 
     // 2. Find target plan
-    const targetPlan = plans.find(p => p.reponedor_id === targetReponedorUuid)
+    const targetPlan = plans ? plans.find(p => p.reponedor_id === targetReponedorUuid) : null
 
     if (targetPlan) {
       // Append to target plan if not already there
@@ -879,7 +878,7 @@ export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
       
       const { error: updateTargetErr } = await supabaseAdmin
         .from('daily_routes_plan')
-        .update({ optimized_pos_sequence: updatedTargetSeq, status: 'EN_PROCESO' })
+        .update({ optimized_pos_sequence: updatedTargetSeq })
         .eq('id', targetPlan.id)
 
       if (updateTargetErr) throw new Error(updateTargetErr.message)
@@ -889,9 +888,9 @@ export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
         .from('daily_routes_plan')
         .insert({
           reponedor_id: targetReponedorUuid,
-          date: todayStr,
+          date: planDate,
           optimized_pos_sequence: [pdvId],
-          status: 'EN_PROCESO'
+          status: 'ASIGNADA'
         })
 
       if (createErr) throw new Error(createErr.message)
@@ -901,6 +900,93 @@ export async function reassignPdv(pdvId: string, targetReponedorUuid: string) {
   } catch (e: any) {
     console.error('Reassignment failed:', e)
     return { error: e.message || 'Error al reasignar punto de venta.' }
+  }
+}
+
+export async function addPdvToRoute(pdvId: string, reponedorUuid: string, dateStr: string) {
+  console.log(`Adding PDV ${pdvId} to worker ${reponedorUuid} on date ${dateStr}...`)
+  try {
+    // Remove the PDV from any other worker's plan on the same date first
+    const { data: otherPlans } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .select('*')
+      .eq('date', dateStr)
+
+    if (otherPlans) {
+      for (const otherPlan of otherPlans) {
+        if (otherPlan.reponedor_id !== reponedorUuid && otherPlan.optimized_pos_sequence.includes(pdvId)) {
+          const newSeq = otherPlan.optimized_pos_sequence.filter((id: string) => id !== pdvId)
+          await supabaseAdmin
+            .from('daily_routes_plan')
+            .update({ optimized_pos_sequence: newSeq })
+            .eq('id', otherPlan.id)
+        }
+      }
+    }
+
+    const { data: plan, error: fetchErr } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .select('*')
+      .eq('reponedor_id', reponedorUuid)
+      .eq('date', dateStr)
+      .maybeSingle()
+
+    if (fetchErr) throw new Error(fetchErr.message)
+
+    if (plan) {
+      const updatedSeq = [...plan.optimized_pos_sequence]
+      if (!updatedSeq.includes(pdvId)) {
+        updatedSeq.push(pdvId)
+      }
+      const { error } = await supabaseAdmin
+        .from('daily_routes_plan')
+        .update({ optimized_pos_sequence: updatedSeq })
+        .eq('id', plan.id)
+      if (error) throw new Error(error.message)
+    } else {
+      const { error } = await supabaseAdmin
+        .from('daily_routes_plan')
+        .insert({
+          reponedor_id: reponedorUuid,
+          date: dateStr,
+          optimized_pos_sequence: [pdvId],
+          status: 'ASIGNADA'
+        })
+      if (error) throw new Error(error.message)
+    }
+
+    return await getDashboardData()
+  } catch (e: any) {
+    console.error('Failed to add PDV to route:', e)
+    return { error: e.message || 'Error al asignar punto de venta.' }
+  }
+}
+
+export async function removePdvFromRoute(pdvId: string, reponedorUuid: string, dateStr: string) {
+  console.log(`Removing PDV ${pdvId} from worker ${reponedorUuid} on date ${dateStr}...`)
+  try {
+    const { data: plan, error: fetchErr } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .select('*')
+      .eq('reponedor_id', reponedorUuid)
+      .eq('date', dateStr)
+      .maybeSingle()
+
+    if (fetchErr) throw new Error(fetchErr.message)
+    if (!plan) throw new Error('No se encontró el plan de ruta.')
+
+    const newSeq = plan.optimized_pos_sequence.filter((id: string) => id !== pdvId)
+    const { error } = await supabaseAdmin
+      .from('daily_routes_plan')
+      .update({ optimized_pos_sequence: newSeq })
+      .eq('id', plan.id)
+
+    if (error) throw new Error(error.message)
+
+    return await getDashboardData()
+  } catch (e: any) {
+    console.error('Failed to remove PDV from route:', e)
+    return { error: e.message || 'Error al remover punto de venta de la ruta.' }
   }
 }
 
@@ -1005,85 +1091,95 @@ export async function getTomorrowRoutesPlan() {
       return optimized
     }
 
-    // Geographical K-Means Clustering to partition PDVs among workers (organize where each worker goes)
-    const numWorkers = users.length
-    if (numWorkers === 0) return { published: false, plans: [] }
+    // Geographical K-Means Clustering partitioned by City/Department
+    const suggestedPlans: any[] = []
+    const cities = ['Cochabamba', 'Santa Cruz', 'La Paz']
 
-    // Initialize centroids by choosing well-spaced out PDVs from the pool
-    const centroids: { lat: number; lng: number }[] = []
-    for (let i = 0; i < numWorkers; i++) {
-      const idx = Math.min(pdvPool.length - 1, Math.floor((i * pdvPool.length) / numWorkers))
-      centroids.push({
-        lat: parseFloat(pdvPool[idx].latitude),
-        lng: parseFloat(pdvPool[idx].longitude)
-      })
-    }
+    for (let cIdx = 0; cIdx < cities.length; cIdx++) {
+      const city = cities[cIdx]
+      // Workers assigned to this city (using index round-robin matching seedDatabase)
+      const cityWorkers = (users || []).filter((_, idx) => idx % 3 === cIdx)
+      // PDVs located in this city
+      const cityPdvs = pdvPool.filter(p => p.market === city)
 
-    // Run K-Means for 5 iterations to group close-by points of sale
-    const assignments: Record<string, number> = {}
-    for (let iter = 0; iter < 5; iter++) {
-      // 1. Assign each PDV to the nearest centroid
-      pdvPool.forEach(pdv => {
-        const pdvLat = parseFloat(pdv.latitude)
-        const pdvLng = parseFloat(pdv.longitude)
-        let bestIdx = 0
-        let bestDist = Infinity
-        for (let i = 0; i < numWorkers; i++) {
-          const dist = Math.pow(pdvLat - centroids[i].lat, 2) + Math.pow(pdvLng - centroids[i].lng, 2)
-          if (dist < bestDist) {
-            bestDist = dist
-            bestIdx = i
+      if (cityWorkers.length === 0) continue
+
+      const numCityWorkers = cityWorkers.length
+
+      // Initialize centroids for this city's workers
+      const centroids: { lat: number; lng: number }[] = []
+      for (let i = 0; i < numCityWorkers; i++) {
+        const idx = Math.min(cityPdvs.length - 1, Math.floor((i * cityPdvs.length) / numCityWorkers))
+        centroids.push({
+          lat: parseFloat(cityPdvs[idx]?.latitude || '-17.7862'),
+          lng: parseFloat(cityPdvs[idx]?.longitude || '-63.1812')
+        })
+      }
+
+      // Run K-Means for 5 iterations within this city
+      const assignments: Record<string, number> = {}
+      for (let iter = 0; iter < 5; iter++) {
+        // 1. Assign each PDV to the nearest centroid
+        cityPdvs.forEach(pdv => {
+          const pdvLat = parseFloat(pdv.latitude)
+          const pdvLng = parseFloat(pdv.longitude)
+          let bestIdx = 0
+          let bestDist = Infinity
+          for (let i = 0; i < numCityWorkers; i++) {
+            const dist = Math.pow(pdvLat - centroids[i].lat, 2) + Math.pow(pdvLng - centroids[i].lng, 2)
+            if (dist < bestDist) {
+              bestDist = dist
+              bestIdx = i
+            }
           }
-        }
-        assignments[pdv.id] = bestIdx
-      })
+          assignments[pdv.id] = bestIdx
+        })
 
-      // 2. Recalculate centroids
-      const newCentroids = Array.from({ length: numWorkers }, () => ({ lat: 0, lng: 0, count: 0 }))
-      pdvPool.forEach(pdv => {
-        const clusterIdx = assignments[pdv.id]
-        newCentroids[clusterIdx].lat += parseFloat(pdv.latitude)
-        newCentroids[clusterIdx].lng += parseFloat(pdv.longitude)
-        newCentroids[clusterIdx].count += 1
-      })
+        // 2. Recalculate centroids
+        const newCentroids = Array.from({ length: numCityWorkers }, () => ({ lat: 0, lng: 0, count: 0 }))
+        cityPdvs.forEach(pdv => {
+          const clusterIdx = assignments[pdv.id]
+          if (clusterIdx !== undefined && newCentroids[clusterIdx]) {
+            newCentroids[clusterIdx].lat += parseFloat(pdv.latitude)
+            newCentroids[clusterIdx].lng += parseFloat(pdv.longitude)
+            newCentroids[clusterIdx].count += 1
+          }
+        })
 
-      for (let i = 0; i < numWorkers; i++) {
-        if (newCentroids[i].count > 0) {
-          centroids[i] = {
-            lat: newCentroids[i].lat / newCentroids[i].count,
-            lng: newCentroids[i].lng / newCentroids[i].count
+        for (let i = 0; i < numCityWorkers; i++) {
+          if (newCentroids[i].count > 0) {
+            centroids[i] = {
+              lat: newCentroids[i].lat / newCentroids[i].count,
+              lng: newCentroids[i].lng / newCentroids[i].count
+            }
           }
         }
       }
-    }
 
-    // Allocate clusters to workers and optimize their route sequence
-    const suggestedPlans = (users || []).map((user, idx) => {
-      // Get all PDVs in this geographical cluster
-      const clusterPdvs = pdvPool.filter(pdv => assignments[pdv.id] === idx)
-      
-      // Sort cluster PDVs by proximity to the cluster's centroid
-      const center = centroids[idx]
-      clusterPdvs.sort((a, b) => {
-        const distA = Math.pow(parseFloat(a.latitude) - center.lat, 2) + Math.pow(parseFloat(a.longitude) - center.lng, 2)
-        const distB = Math.pow(parseFloat(b.latitude) - center.lat, 2) + Math.pow(parseFloat(b.longitude) - center.lng, 2)
-        return distA - distB
+      // Allocate clusters to this city's workers and optimize sequence
+      cityWorkers.forEach((user, idx) => {
+        const clusterPdvs = cityPdvs.filter(pdv => assignments[pdv.id] === idx)
+        const center = centroids[idx] || { lat: parseFloat(cityPdvs[0]?.latitude || '0'), lng: parseFloat(cityPdvs[0]?.longitude || '0') }
+
+        clusterPdvs.sort((a, b) => {
+          const distA = Math.pow(parseFloat(a.latitude) - center.lat, 2) + Math.pow(parseFloat(a.longitude) - center.lng, 2)
+          const distB = Math.pow(parseFloat(b.latitude) - center.lat, 2) + Math.pow(parseFloat(b.longitude) - center.lng, 2)
+          return distA - distB
+        })
+
+        const maxPdvs = 7 + (idx % 2)
+        const selectedPdvs = clusterPdvs.slice(0, maxPdvs)
+        const optimizedSeq = optimizeSequence(selectedPdvs)
+
+        suggestedPlans.push({
+          reponedorId: user.id,
+          reponedorName: user.name,
+          sequence: optimizedSeq,
+          published: false,
+          status: 'ASIGNADA'
+        })
       })
-
-      // Limit to 7-8 points to avoid worker overload
-      const maxPdvs = 7 + (idx % 2)
-      const selectedPdvs = clusterPdvs.slice(0, maxPdvs)
-      
-      // Run TSP Nearest Neighbor on this localized cluster
-      const optimizedSeq = optimizeSequence(selectedPdvs)
-      return {
-        reponedorId: user.id,
-        reponedorName: user.name,
-        sequence: optimizedSeq,
-        published: false,
-        status: 'ASIGNADA'
-      }
-    })
+    }
 
     return { published: false, plans: suggestedPlans }
   } catch (e: any) {
