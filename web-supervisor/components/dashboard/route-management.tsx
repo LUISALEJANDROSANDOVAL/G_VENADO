@@ -301,7 +301,7 @@ function RouteHistoryRow({
         {/* View on Map Button */}
         {onViewOnMap && (
           <Button
-            size="xs"
+            size="sm"
             variant="outline"
             className="h-7 px-2.5 gap-1 text-[10px] bg-primary/10 border-primary/20 hover:bg-primary hover:text-primary-foreground text-primary shrink-0 transition-all duration-200 cursor-pointer"
             onClick={(e) => {
@@ -524,7 +524,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
   const getRecommendedWorker = (pdv: any) => {
     if (!reponedores || reponedores.length === 0 || !pdv.lat || !pdv.lng) return null
-    let bestWorker = null, bestScore = Infinity
+    let bestWorker: any = null, bestScore = Infinity
     reponedores.forEach(w => {
       if (w.name === pdv.assignedWorker || w.status === 'Completado') return
       const score = getDistance(pdv.lat, pdv.lng, w.lat, w.lng) * 1000 + (w.activeOrders || 0) * 2 + (w.delay ? w.delay * 0.1 : 0)

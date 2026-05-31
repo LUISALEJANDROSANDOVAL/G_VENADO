@@ -86,6 +86,7 @@ export const generatePDVs = (count: number = 150): PDV[] => {
       lng: -58.4 + Math.random() * 0.5,
       visited: Math.random() > 0.3,
       lastVisit: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 86400000).toISOString() : undefined,
+      availableDays: ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
     })
   }
   return pdvs
