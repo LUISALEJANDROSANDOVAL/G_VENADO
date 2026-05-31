@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/gps_service.dart';
+import '../theme/app_colors.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -98,8 +99,8 @@ class _HomeViewState extends State<HomeView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Venado OptiRoute - Reponedor'),
-        backgroundColor: Colors.red[800],
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.crimson,
+        foregroundColor: AppColors.snow,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -162,8 +163,8 @@ class _HomeViewState extends State<HomeView> {
               icon: Icon(_isTracking ? Icons.gps_off : Icons.gps_fixed),
               label: Text(_isTracking ? 'Detener Rastreo' : 'Iniciar Rastreo GPS'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isTracking ? Colors.red[700] : Colors.green[700],
-                foregroundColor: Colors.white,
+                backgroundColor: _isTracking ? AppColors.crimsonAlt : AppColors.darkTurquoise,
+                foregroundColor: AppColors.snow,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),

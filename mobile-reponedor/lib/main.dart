@@ -1,45 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/supabase_service.dart';
-import 'views/home_view.dart';
+import 'theme/app_theme.dart';
+import 'views/login_view.dart';
 
 void main() async {
-  // Ensure Flutter engine is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables from .env asset
+  // Carga variables de entorno (.env real o .env.example como fallback)
   try {
-    await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: '.env');
   } catch (e) {
-    debugPrint('Error cargando .env: $e');
+    try {
+      await dotenv.load(fileName: '.env.example');
+    } catch (e2) {
+      debugPrint('Variables de entorno no cargadas (modo mock UI): $e2');
+    }
   }
 
-  // Initialize Supabase if variables are defined
+  // TODO: Supabase se inicializará cuando se integre auth y sync real
   try {
     await SupabaseService.initialize();
   } catch (e) {
-    debugPrint('Error inicializando Supabase: $e');
+    debugPrint('Supabase no inicializado (modo mock UI): $e');
   }
 
-  runApp(const MyApp());
+  runApp(const FieldOpsApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FieldOpsApp extends StatelessWidget {
+  const FieldOpsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Venado OptiRoute Mobile',
+      title: 'TRACE V — Reponedores',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.red,
-          primary: Colors.red[800],
-        ),
-        useMaterial3: true,
-      ),
-      home: const HomeView(),
+      theme: AppTheme.darkTheme,
+      home: const LoginView(),
     );
   }
 }
