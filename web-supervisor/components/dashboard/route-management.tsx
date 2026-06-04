@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
-import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan, addPdvToRoute, removePdvFromRoute } from '@/app/actions'
+import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan, addPdvToRoute, removePdvFromRoute, getRoutesPlanForDate, publishRoutesPlanForDate } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ function RouteHistoryMapModal({
     import('leaflet').then((LModule) => {
       if (!active) return
       const L = LModule.default
-      
+
       if (!mapContainerRef.current) return
 
       // Initialize map
@@ -180,7 +180,7 @@ function RouteHistoryMapModal({
         // Fit bounds
         try {
           map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 })
-        } catch (_) {}
+        } catch (_) { }
       }
     })
 
@@ -196,7 +196,7 @@ function RouteHistoryMapModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
-      <Card 
+      <Card
         className="relative w-full max-w-3xl overflow-hidden shadow-2xl border border-border bg-card"
         onClick={e => e.stopPropagation()}
       >
@@ -225,14 +225,14 @@ function RouteHistoryMapModal({
 }
 
 // ─── Route History Row ────────────────────────────────────────────────────────
-function RouteHistoryRow({ 
-  entry, 
-  pdvs, 
-  onZoom, 
-  onViewOnMap 
-}: { 
-  entry: RouteHistoryEntry; 
-  pdvs: any[]; 
+function RouteHistoryRow({
+  entry,
+  pdvs,
+  onZoom,
+  onViewOnMap
+}: {
+  entry: RouteHistoryEntry;
+  pdvs: any[];
   onZoom: (u: string) => void;
   onViewOnMap?: (workerId: string) => void;
 }) {
@@ -397,6 +397,7 @@ function RouteHistoryRow({
                             {pdvEvidences.length} evidencia{pdvEvidences.length > 1 ? 's' : ''}
                           </span>
                         )}
+
                       </div>
 
                       {/* Status pill */}
@@ -487,21 +488,26 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'operations' | 'history' | 'tomorrow'>('operations')
 
-  // Dynamic tomorrow dates based on system date
-  const [tomorrowDate] = useState(() => {
+  // Dynamic planning date picker
+  const [planningDateStr, setPlanningDateStr] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
-    return d
+    return d.toISOString().split('T')[0] // default to tomorrow
   })
-  const tomorrowFormattedFull = tomorrowDate.toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }) // e.g. "01 de junio de 2026"
-  const tomorrowFormattedShort = tomorrowDate.toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: 'short'
-  }) // e.g. "01 Jun"
+
+  const getPlanningFormattedFull = (dateStr: string) => {
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return ''
+    const year = parseInt(parts[0])
+    const month = parseInt(parts[1]) - 1
+    const day = parseInt(parts[2])
+    const date = new Date(year, month, day)
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    })
+  }
 
   // Tomorrow planning states
   const [tomorrowPublished, setTomorrowPublished] = useState(false)
@@ -515,7 +521,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       const fetchTomorrowPlan = async () => {
         setIsLoadingTomorrow(true)
         try {
-          const res = await getTomorrowRoutesPlan()
+          const res = await getRoutesPlanForDate(planningDateStr)
           if ('error' in res && res.error) {
             toast({
               title: "Error al cargar planificación",
@@ -534,7 +540,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       }
       fetchTomorrowPlan()
     }
-  }, [activeTab])
+  }, [activeTab, planningDateStr])
 
   // Date state for history audit
   const [selectedHistoryDate, setSelectedHistoryDate] = useState('2026-05-31')
@@ -601,7 +607,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
           }
           return p
         })
-        const res = await publishTomorrowRoutesPlan(updatedPlans)
+        const res = await publishRoutesPlanForDate(updatedPlans, planningDateStr)
         if ('error' in res && res.error) {
           alert('Error al reordenar: ' + res.error)
         } else {
@@ -631,7 +637,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
     setIsAssigningWorker(reponedorId)
     try {
       // Publish only this worker's plan (send all plans to keep consistency in backend)
-      const res = await publishTomorrowRoutesPlan(tomorrowPlans)
+      const res = await publishRoutesPlanForDate(tomorrowPlans, planningDateStr)
       if ('error' in res && res.error) {
         toast({
           title: `Error al asignar ruta a ${reponedorName}`,
@@ -724,11 +730,13 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
   const handleReassignTomorrow = async (pdvId: string, targetReponedorId: string) => {
     let currentReponedorId = ''
-    tomorrowPlans.forEach(p => {
-      if (p.sequence.includes(pdvId)) {
-        currentReponedorId = p.reponedorId
-      }
-    })
+    if (tomorrowPlans) {
+      tomorrowPlans.forEach(p => {
+        if (p.sequence.includes(pdvId)) {
+          currentReponedorId = p.reponedorId
+        }
+      })
+    }
 
     if (tomorrowPublished) {
       setIsReassigning(true)
@@ -749,7 +757,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         let seq = p.sequence
         if (p.reponedorId === currentReponedorId) {
           seq = seq.filter((id: string) => id !== pdvId)
@@ -760,7 +768,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
           }
         }
         return { ...p, sequence: seq }
-      }))
+      }) : null)
     }
   }
 
@@ -783,12 +791,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         if (p.reponedorId === reponedorId) {
           return { ...p, sequence: p.sequence.filter((id: string) => id !== pdvId) }
         }
         return p
-      }))
+      }) : null)
     }
   }
 
@@ -811,14 +819,14 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         setIsReassigning(false)
       }
     } else {
-      setTomorrowPlans(prev => prev.map(p => {
+      setTomorrowPlans(prev => prev ? prev.map(p => {
         if (p.reponedorId === reponedorId) {
           if (!p.sequence.includes(pdvId)) {
             return { ...p, sequence: [...p.sequence, pdvId] }
           }
         }
         return p
-      }))
+      }) : null)
     }
   }
 
@@ -893,13 +901,13 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
     const pdvCount = w.sequence ? w.sequence.length : 8
     const score = (daySeed + nameLength) % 3
-    const status = score === 0 ? 'En Proceso' : score === 1 ? 'Asignada' : 'Completada'
+    const status: 'Completada' | 'En Proceso' | 'Asignada' = score === 0 ? 'En Proceso' : score === 1 ? 'Asignada' : 'Completada'
 
     const completedCount = status === 'Completada'
       ? pdvCount
       : status === 'En Proceso'
-      ? Math.max(1, Math.round(pdvCount * 0.6))
-      : 0
+        ? Math.max(1, Math.round(pdvCount * 0.6))
+        : 0
 
     const dateFormatted = getFormattedHistoryDate(selectedHistoryDate)
 
@@ -1310,7 +1318,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Auditar Fecha:
                 </span>
-                <input 
+                <input
                   type="date"
                   value={selectedHistoryDate}
                   onChange={(e) => setSelectedHistoryDate(e.target.value)}
@@ -1361,23 +1369,31 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
             <>
               {/* Header Card */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-500/5 p-5 rounded-xl border border-border">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-primary animate-pulse" />
-                    Planificación de Rutas para Mañana ({tomorrowFormattedFull})
-                  </h2>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary animate-pulse" />
+                      Planificación de Rutas
+                    </h2>
+                    <input
+                      type="date"
+                      value={planningDateStr}
+                      onChange={(e) => setPlanningDateStr(e.target.value)}
+                      className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Sugerencias de optimización automática generadas por el Feedback Loop y calibradas en base a tiempos de hoy.
                   </p>
                 </div>
-                
+
                 <Button
                   disabled={isPublishingTomorrow || tomorrowPublished || !tomorrowPlans || tomorrowPlans.length === 0}
                   onClick={async () => {
                     if (tomorrowPublished || !tomorrowPlans) return
                     setIsPublishingTomorrow(true)
                     try {
-                      const res = await publishTomorrowRoutesPlan(tomorrowPlans)
+                      const res = await publishRoutesPlanForDate(tomorrowPlans, planningDateStr)
                       if ('error' in res && res.error) {
                         toast({
                           title: "Error al publicar rutas",
@@ -1389,7 +1405,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                         setTomorrowPlans(prev => prev ? prev.map(p => ({ ...p, published: true })) : null)
                         toast({
                           title: "¡Éxito! Rutas publicadas",
-                          description: `Rutas para el ${tomorrowFormattedFull} aprobadas y publicadas en Supabase. Se han notificado a los reponedores.`,
+                          description: `Rutas para el ${getPlanningFormattedFull(planningDateStr)} aprobadas y publicadas en Supabase. Se han notificado a los reponedores.`,
                         })
                         if (onRefresh) onRefresh()
                       }
@@ -1435,7 +1451,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                 <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
                   <Check className="h-5 w-5 shrink-0" />
                   <div>
-                    <h4 className="font-semibold text-sm">Jornada de Mañana Publicada</h4>
+                    <h4 className="font-semibold text-sm">Jornada Publicada</h4>
                     <p className="text-xs text-emerald-400/80 mt-0.5">
                       Las rutas y secuencias de visitas ya están aprobadas e impactadas en el backend de Supabase. Los reponedores recibirán las actualizaciones en su aplicación móvil al iniciar su jornada.
                     </p>
@@ -1447,7 +1463,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   <div>
                     <h4 className="font-semibold text-sm">Sugerencias de Rutas Pendientes de Aprobación</h4>
                     <p className="text-xs text-indigo-400/80 mt-0.5">
-                      El Feedback Loop ha recalculado las rutas óptimas para mañana ({tomorrowFormattedFull}) basándose en las duraciones reales de hoy y la proximidad geográfica (TSP). Revisa los detalles antes de publicar.
+                      El Feedback Loop ha recalculado las rutas óptimas para el {getPlanningFormattedFull(planningDateStr)} basándose en las duraciones reales de hoy y la proximidad geográfica (TSP). Revisa los detalles antes de publicar.
                     </p>
                   </div>
                 </div>
@@ -1489,17 +1505,17 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                 {(tomorrowPlans || []).map((p, idx) => {
                   const nameLength = p.reponedorName.length
                   const plannedCount = p.sequence.length
-                  
+
                   // Estimated duration
                   const estHours = ((nameLength * 7 + 220) / 60).toFixed(1)
                   // Distance efficiency
                   const estEff = ((nameLength % 5) * 2.5 + 8.5).toFixed(1)
-                  
+
                   // Find reponedor route from active list
                   const workerObj = reponedores?.find(w => w.dbUuid === p.reponedorId || w.id === p.reponedorId)
                   const routeName = workerObj?.route || 'Urbana'
                   const workerCity = workerObj?.city || 'Santa Cruz'
-                  
+
                   // Optimization details
                   const optDetail = nameLength % 2 === 0
                     ? "Calibrado de tiempos de servicio: Se ajustó el tiempo estimado de atención en base al promedio de visitas de hoy."

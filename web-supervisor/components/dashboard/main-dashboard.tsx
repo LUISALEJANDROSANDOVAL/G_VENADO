@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { KPICards } from './kpi-cards'
-import { Users, CheckCircle, AlertTriangle, Eye, ArrowRight, ShieldAlert, Clock, CheckSquare, XSquare, X, Search, SlidersHorizontal, TrendingUp, Sun, Cloud, CloudRain, Car, Bell, AlertCircle, Camera, PackageX, MapPin } from 'lucide-react'
+import { Users, CheckCircle, AlertTriangle, Eye, ArrowRight, ShieldAlert, Clock, CheckSquare, XSquare, X, Search, SlidersHorizontal, TrendingUp, Sun, Cloud, CloudRain, Car, Bell, AlertCircle, MapPin } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 
@@ -30,15 +30,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
   const [isBlockadeDeclared, setIsBlockadeDeclared] = useState(false)
   const [notificationSentStatus, setNotificationSentStatus] = useState<string | null>(null)
 
-  // Zoom photo state
-  const [selectedZoomPhoto, setSelectedZoomPhoto] = useState<string | null>(null)
 
-  // Stockout alerts state
-  const [stockoutAlerts, setStockoutAlerts] = useState([
-    { id: 1, product: 'Ketchup Venado 400g', pdv: 'Hipermaxi Equipetrol', time: '10:15 AM', managed: false },
-    { id: 2, product: 'Mayonesa Venado 200g', pdv: 'Fidalga Banzer', time: '10:30 AM', managed: false },
-    { id: 3, product: 'Mostaza Venado 200g', pdv: 'Dumbo Central', time: '10:45 AM', managed: false },
-  ])
 
   // Real-time weather data state connected to Open-Meteo API
   const [weatherData, setWeatherData] = useState<{
@@ -456,8 +448,8 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
           <Card className="border-border shadow-sm">
             <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-sm font-bold">Avance de Auditoría por Canal</CardTitle>
-                <CardDescription className="text-[10px] hidden sm:block">Porcentaje de visitas completadas por segmentación Venado</CardDescription>
+                <CardTitle className="text-sm font-bold">Avance de Visitas por Tipo de Tienda</CardTitle>
+                <CardDescription className="text-[10px] hidden sm:block">Porcentaje de visitas completadas según el tipo de cliente</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
@@ -465,7 +457,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Pareto */}
                 <div className="space-y-1 bg-blue-500/5 p-2 rounded-xl border border-blue-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">PARETO (Estratégico)</span>
+                    <span className="truncate">Clientes Clave (Pareto)</span>
                     <span>{Math.round(paretoPct)}%</span>
                   </div>
                   <Progress value={paretoPct} className="h-1 bg-blue-200" />
@@ -475,7 +467,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Mayorista */}
                 <div className="space-y-1 bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">MAYORISTA</span>
+                    <span className="truncate">Clientes Mayoristas</span>
                     <span>{Math.round(mayoristaPct)}%</span>
                   </div>
                   <Progress value={mayoristaPct} className="h-1 bg-emerald-200" />
@@ -485,7 +477,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 {/* Detallista */}
                 <div className="space-y-1 bg-amber-500/5 p-2 rounded-xl border border-amber-500/10">
                   <div className="flex justify-between items-center text-[10px] font-bold text-foreground">
-                    <span className="truncate">DETALLISTA / MINORISTA</span>
+                    <span className="truncate">Tiendas / Minoristas</span>
                     <span>{Math.round(detallistaPct)}%</span>
                   </div>
                   <Progress value={detallistaPct} className="h-1 bg-amber-200" />
@@ -500,10 +492,10 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             <CardHeader className="p-3 pb-1">
               <div className="flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
-                <CardTitle className="text-sm font-bold">Progreso de la Jornada (Curva S)</CardTitle>
+                <CardTitle className="text-sm font-bold">Progreso de Visitas (Planificado vs Real)</CardTitle>
               </div>
               <CardDescription className="text-[10px]">
-                Visitas completadas (Real vs Planificado)
+                Comparación entre el avance planificado y las visitas completadas reales
               </CardDescription>
             </CardHeader>
             <CardContent className="p-3 pt-0">
@@ -570,77 +562,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             </CardContent>
           </Card>
 
-          {/* Muro de Evidencias en Vivo (Live Photo Feed) */}
-          <Card className="border-border shadow-sm">
-            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-1.5">
-                <Camera className="h-4 w-4 text-emerald-600 shrink-0" />
-                <CardTitle className="text-sm font-bold">Evidencias Recientes</CardTitle>
-              </div>
-              <CardDescription className="text-[10px] hidden sm:block">Fotografías reportadas en vivo por los reponedores</CardDescription>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              {photoEvidences.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-xs flex flex-col items-center justify-center gap-1">
-                  <Camera className="h-6 w-6 text-muted-foreground/30" />
-                  <p>No hay evidencias fotográficas registradas hoy.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  {(photoEvidences || []).slice(0, 3).map((ev) => {
-                    const displayUrl = ev.afterUrl || ev.beforeUrl
-                    return (
-                      <div key={ev.id} className="group relative bg-card border border-border rounded-xl overflow-hidden shadow-xs hover:shadow-sm hover:border-emerald-500/30 transition-all flex flex-col justify-between">
-                        {/* Card Header (PDV and Reponedor) */}
-                        <div className="p-2 bg-muted/10 border-b border-border/40 min-w-0">
-                          <p className="text-[10px] font-bold text-foreground truncate" title={ev.pdvName}>
-                            {ev.pdvName}
-                          </p>
-                          <div className="flex justify-between items-center mt-0.5 gap-1">
-                            <span className="text-[8px] text-muted-foreground truncate max-w-[60px]">
-                              {ev.reponedorName}
-                            </span>
-                            <Badge variant="outline" className="text-[8px] font-bold px-1 py-0 border-emerald-500/10 text-emerald-600 bg-emerald-500/5 scale-90 shrink-0">
-                              {ev.taskName}
-                            </Badge>
-                          </div>
-                        </div>
 
-                        {/* Image Preview Container */}
-                        <div 
-                          className="relative aspect-video bg-slate-900 flex items-center justify-center overflow-hidden cursor-zoom-in h-14 sm:h-auto"
-                          onClick={() => setSelectedZoomPhoto(displayUrl)}
-                        >
-                          {displayUrl ? (
-                            <img 
-                              src={displayUrl} 
-                              alt={`${ev.taskName} - ${ev.pdvName}`} 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="text-[10px] text-muted-foreground">Sin foto</div>
-                          )}
-                          <div className="absolute bottom-1 left-1 bg-black/60 backdrop-blur-sm text-[8px] text-white px-1 py-0.5 rounded font-semibold scale-90">
-                            {ev.afterUrl ? 'Cierre' : 'Inicio'}
-                          </div>
-                        </div>
-
-                        {/* Footer (Timestamp) */}
-                        <div className="p-1 border-t border-border/40 bg-muted/5 flex justify-between items-center text-[8px] text-muted-foreground">
-                          <span className="italic truncate max-w-[50px]">
-                            {ev.afterUrl ? 'Cerrado' : 'Cierre pend.'}
-                          </span>
-                          <span className="font-semibold">
-                            {new Date(ev.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
         </div>
 
@@ -673,7 +595,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white text-[10px] font-bold py-1 px-2 rounded-xl flex items-center justify-center gap-1 shadow-xs transition-all duration-200 cursor-pointer h-8"
                 >
                   <Bell className="h-3 w-3 shrink-0" />
-                  Notificar ({delayedWorkers.length})
+                  Avisar Retrasos ({delayedWorkers.length})
                 </Button>
 
                 {/* Declarar bloqueo de vías */}
@@ -690,7 +612,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                   ].join(" ")}
                 >
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  {isBlockadeDeclared ? "Bloqueo ON" : "Bloqueo de vías"}
+                  {isBlockadeDeclared ? "Bloqueo Activo" : "Reportar Bloqueo"}
                 </Button>
               </div>
 
@@ -710,7 +632,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider">Alertas Activas ({delayedWorkers.length})</CardTitle>
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider">Reponedores con Retraso ({delayedWorkers.length})</CardTitle>
                 </div>
               </div>
             </CardHeader>
@@ -718,7 +640,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               {delayedWorkers.length === 0 ? (
                 <div className="py-4 text-center text-muted-foreground text-[10px] flex flex-col items-center gap-1">
                   <CheckCircle className="h-6 w-6 text-emerald-500" />
-                  Sin alertas críticas registradas hoy.
+                  Todos los reponedores van al día hoy.
                 </div>
               ) : (
                 <div className="max-h-[140px] overflow-y-auto pr-1 space-y-1.5">
@@ -734,13 +656,13 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                           <p className="text-[9px] text-muted-foreground">Ruta: {worker.route}</p>
                         </div>
                         <Badge variant="destructive" className="text-[8px] font-bold uppercase py-0 px-1 animate-pulse shrink-0 scale-90">
-                          Retraso
+                          Atrasado
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-400">
                         <Clock className="h-3 w-3 shrink-0" />
                         <span className="font-semibold">
-                          Retraso de {worker.delay} min.
+                          Atrasado por {worker.delay} min.
                         </span>
                       </div>
                     </div>
@@ -750,80 +672,19 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
             </CardContent>
           </Card>
 
-          {/* Stockout Alerts Widget */}
-          <Card className="border-border shadow-sm">
-            <CardHeader className="p-3 pb-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <PackageX className="h-4 w-4 text-rose-500 shrink-0" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider">Quiebres de Stock ({stockoutAlerts.filter(a => !a.managed).length})</CardTitle>
-                </div>
-                {stockoutAlerts.filter(a => !a.managed).length > 0 && (
-                  <Badge className="bg-rose-500 text-white text-[8px] font-extrabold px-1 h-4 border-none animate-pulse">CRÍTICO</Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              {stockoutAlerts.filter(a => !a.managed).length === 0 ? (
-                <div className="py-4 text-center text-muted-foreground text-[10px] flex flex-col items-center gap-1">
-                  <CheckCircle className="h-6 w-6 text-emerald-500" />
-                  Quiebres de stock gestionados.
-                </div>
-              ) : (
-                <div className="max-h-[140px] overflow-y-auto pr-1 space-y-1.5">
-                  {stockoutAlerts.map((alert) => (
-                    <div 
-                      key={alert.id}
-                      className={[
-                        "p-2 rounded-lg border transition-all flex flex-col gap-1 text-xs",
-                        alert.managed 
-                          ? "bg-muted/40 border-border/40 opacity-60" 
-                          : "bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10"
-                      ].join(" ")}
-                    >
-                      <div className="flex justify-between items-start gap-1">
-                        <div className="min-w-0 space-y-0.5">
-                          <p className="text-[11px] font-bold text-foreground truncate">{alert.product}</p>
-                          <div className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
-                            <MapPin className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate max-w-[120px]">{alert.pdv}</span>
-                          </div>
-                        </div>
-                        <span className="text-[8px] text-muted-foreground font-medium whitespace-nowrap shrink-0">{alert.time}</span>
-                      </div>
-                      
-                      {!alert.managed && (
-                        <div className="flex justify-end mt-0.5">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                               setStockoutAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, managed: true } : a))
-                            }}
-                            className="h-5 px-2 text-[8px] font-bold rounded-lg border-rose-500/20 text-rose-600 hover:text-rose-700 hover:bg-rose-500/5 cursor-pointer"
-                          >
-                            Gestionar
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Quick Stats Summary */}
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Resumen de la Jornada</CardTitle>
-              <CardDescription>Datos clave agregados hoy</CardDescription>
+              <CardTitle className="text-lg font-bold">Resumen del Día</CardTitle>
+              <CardDescription>Datos clave acumulados hoy</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-2 text-xs">
                   <CheckSquare className="h-4 w-4 text-emerald-500" />
-                  <span className="font-semibold text-muted-foreground">Puntos de Venta Visitados</span>
+                  <span className="font-semibold text-muted-foreground">Tiendas Visitadas</span>
                 </div>
                 <span className="text-sm font-bold text-foreground">
                   {pdvs.filter(p => p.visited).length} / {pdvs.length}
@@ -833,7 +694,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
               <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
                 <div className="flex items-center gap-2 text-xs">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <span className="font-semibold text-muted-foreground">Reportes de Cierre/Desvíos</span>
+                  <span className="font-semibold text-muted-foreground">Alertas de Desvíos</span>
                 </div>
                 <span className="text-sm font-bold text-foreground">
                   {kpis.criticalAlerts}
@@ -849,10 +710,10 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
                 <div className="flex items-center gap-2">
                   <Car className="h-4.5 w-4.5 text-emerald-600" />
                   <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                    Factores Externos
+                    Clima y Tránsito por Ciudad
                   </CardTitle>
                 </div>
-                <span className="text-[9px] text-muted-foreground font-semibold">En vivo</span>
+                <span className="text-[9px] text-muted-foreground font-semibold">Actualizado</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-2.5">
@@ -916,23 +777,7 @@ export function MainDashboard({ pdvs, reponedores, kpis, photoEvidences = [], on
 
       </div>
 
-      {/* Zoom Photo Overlay */}
-      {selectedZoomPhoto && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in duration-200"
-          onClick={() => setSelectedZoomPhoto(null)}
-        >
-          <div className="relative max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <img src={selectedZoomPhoto} alt="Evidencia Ampliada" className="max-w-full max-h-[85vh] object-contain" />
-            <button 
-              className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors cursor-pointer"
-              onClick={() => setSelectedZoomPhoto(null)}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      )}
+
 
     </div>
   )
