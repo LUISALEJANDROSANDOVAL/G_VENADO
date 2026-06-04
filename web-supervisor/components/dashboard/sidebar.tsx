@@ -66,8 +66,8 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
         </div>
 
         {/* Navigation Modules */}
-        <div className="p-4">
-          <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest px-3 mb-4">
+        <div className="px-4 pt-6">
+          <p className="text-[9px] font-semibold text-blue-200/50 uppercase tracking-[0.2em] px-3 mb-4">
             Módulos
           </p>
           <nav className="space-y-1">
@@ -131,7 +131,7 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
         {/* Logout Button */}
         <Button 
           variant="ghost" 
-          className="w-full justify-start gap-3 bg-white/10 hover:bg-white/20 text-white rounded-xl py-2.5 px-4 font-bold border-none transition-all active:scale-98 cursor-pointer text-xs"
+          className="w-full justify-start gap-3 bg-transparent hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl py-2.5 px-3 font-semibold border-none transition-all active:scale-98 cursor-pointer text-xs"
           onClick={() => {
             if (confirm('¿Desea cerrar la sesión de supervisión?')) {
               console.log('Logging out...')

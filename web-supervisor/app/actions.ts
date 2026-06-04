@@ -990,17 +990,15 @@ export async function removePdvFromRoute(pdvId: string, reponedorUuid: string, d
   }
 }
 
-export async function getTomorrowRoutesPlan() {
+export async function getRoutesPlanForDate(dateStr: string) {
   try {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    const targetDate = new Date(`${dateStr}T12:00:00Z`)
 
-    // 1. Check if plans already exist for tomorrow
+    // 1. Check if plans already exist for dateStr
     const { data: existingPlans, error: fetchErr } = await supabaseAdmin
       .from('daily_routes_plan')
       .select('*')
-      .eq('date', tomorrowStr)
+      .eq('date', dateStr)
 
     if (fetchErr) throw new Error(fetchErr.message)
 
@@ -1034,11 +1032,11 @@ export async function getTomorrowRoutesPlan() {
 
     if (pdvsErr) throw new Error(pdvsErr.message)
 
-    // Determine day of week for tomorrow
+    // Determine day of week for dateStr
     const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
-    const tomorrowDay = days[tomorrow.getDay()] // e.g. "LUN"
+    const targetDayStr = days[targetDate.getDay()] // e.g. "LUN"
 
-    // Filter PDVs available tomorrow
+    // Filter PDVs available dateStr
     const getAvailableDays = (category: string, pdvId: string): string[] => {
       const numericSuffix = parseInt(pdvId.replace(/\D/g, '') || '0', 10)
       switch (category) {
@@ -1060,7 +1058,7 @@ export async function getTomorrowRoutesPlan() {
       }
     }
 
-    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(tomorrowDay))
+    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(targetDayStr))
     const pdvPool = availablePdvs.length > 0 ? availablePdvs : pdvs
 
     // Greedy nearest-neighbor TSP sequence generator
@@ -1188,15 +1186,11 @@ export async function getTomorrowRoutesPlan() {
   }
 }
 
-export async function publishTomorrowRoutesPlan(plans: any[]) {
+export async function publishRoutesPlanForDate(plans: any[], dateStr: string) {
   try {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
-
     const rowsToInsert = plans.map(p => ({
       reponedor_id: p.reponedorId,
-      date: tomorrowStr,
+      date: dateStr,
       optimized_pos_sequence: p.sequence,
       status: 'ASIGNADA'
     }))
