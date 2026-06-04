@@ -91,12 +91,99 @@ export default function ControlTowerDashboard() {
     }, 2000)
   }
 
+  const [dbAnalytics, setDbAnalytics] = useState<{
+    kpis: any
+    analytics: any
+  } | null>(null)
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false)
+
+  const fetchDbAnalytics = async (startDate: string, endDate: string) => {
+    try {
+      // 1. Fetch KPIs
+      const { data: kpiData, error: kpiErr } = await supabase.rpc('calcular_kpis_cobertura', {
+        fecha_inicio: startDate,
+        fecha_fin: endDate
+      })
+
+      // 2. Fetch minutes per task
+      const { data: minutesData, error: minutesErr } = await supabase.rpc('obtener_minutos_efectivos', {
+        fecha_inicio: startDate,
+        fecha_fin: endDate
+      })
+
+      // 3. Fetch route compliance timeline
+      const { data: complianceData, error: complianceErr } = await supabase.rpc('obtener_cumplimiento_rutas', {
+        fecha_inicio: startDate,
+        fecha_fin: endDate
+      })
+
+      if (kpiErr || minutesErr || complianceErr) {
+        console.error('Error fetching analytics from Supabase RPCs:', kpiErr || minutesErr || complianceErr)
+        return null
+      }
+
+      return {
+        kpis: kpiData && kpiData.length > 0 ? kpiData[0] : null,
+        analytics: {
+          effectiveMinutes: minutesData || [],
+          routeCompliance: complianceData || []
+        }
+      }
+    } catch (e) {
+      console.error('Error in fetchDbAnalytics:', e)
+      return null
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+
+    const fetchRangeData = async () => {
+      setIsLoadingAnalytics(true)
+      
+      const today = new Date()
+      let startDateStr = today.toISOString().split('T')[0]
+      let endDateStr = startDateStr
+
+      if (selectedDateRange === 'Ayer') {
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        startDateStr = yesterday.toISOString().split('T')[0]
+        endDateStr = startDateStr
+      } else if (selectedDateRange === 'Últimos 7 días') {
+        const pastDate = new Date()
+        pastDate.setDate(pastDate.getDate() - 7)
+        startDateStr = pastDate.toISOString().split('T')[0]
+      } else if (selectedDateRange === 'Últimos 30 días') {
+        const pastDate = new Date()
+        pastDate.setDate(pastDate.getDate() - 30)
+        startDateStr = pastDate.toISOString().split('T')[0]
+      } else if (selectedDateRange === 'Mayo 2026') {
+        startDateStr = '2026-05-01'
+        endDateStr = '2026-05-31'
+      } else if (selectedDateRange === 'Personalizado') {
+        startDateStr = customStartDate
+        endDateStr = customEndDate
+      }
+
+      const res = await fetchDbAnalytics(startDateStr, endDateStr)
+      if (res && res.kpis) {
+        setDbAnalytics(res)
+      } else {
+        setDbAnalytics(null)
+      }
+      setIsLoadingAnalytics(false)
+    }
+
+    fetchRangeData()
+  }, [selectedDateRange, customStartDate, customEndDate, isLoggedIn])
+
   // Derive filtered KPI and Analytics data
   const filteredData = (() => {
     if (!mockData) return null
 
-    let kpis = { ...mockData.kpis }
-    let analytics = { ...mockData.analytics }
+    let kpis = dbAnalytics?.kpis ? { ...dbAnalytics.kpis } : { ...mockData.kpis }
+    let analytics = dbAnalytics?.analytics ? { ...dbAnalytics.analytics } : { ...mockData.analytics }
 
     // Apply City filters
     if (selectedCity === 'Santa Cruz') {
@@ -176,22 +263,24 @@ export default function ControlTowerDashboard() {
       }
     }
 
-    // Apply Date Range filters
-    if (selectedDateRange === 'Últimos 7 días') {
-      kpis.coverageRate = Math.min(kpis.coverageRate + 1.5, 100)
-      kpis.timeDeviation = Math.max(kpis.timeDeviation - 1.0, 3)
-      kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 4, 2)
-      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 0.8, 100)
-    } else if (selectedDateRange === 'Mayo 2026') {
-      kpis.coverageRate = Math.min(kpis.coverageRate + 2.8, 100)
-      kpis.timeDeviation = Math.max(kpis.timeDeviation - 0.5, 3)
-      kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 15, 8)
-      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 1.2, 100)
-    } else if (selectedDateRange === 'Personalizado') {
-      kpis.coverageRate = Math.min(kpis.coverageRate - 1.2, 100)
-      kpis.timeDeviation = Math.max(kpis.timeDeviation + 0.9, 3)
-      kpis.criticalAlerts = Math.max(kpis.criticalAlerts + 3, 2)
-      kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness - 0.5, 100)
+    // Apply Date Range filters (only if we did NOT load real DB analytics, otherwise use DB directly)
+    if (!dbAnalytics) {
+      if (selectedDateRange === 'Últimos 7 días') {
+        kpis.coverageRate = Math.min(kpis.coverageRate + 1.5, 100)
+        kpis.timeDeviation = Math.max(kpis.timeDeviation - 1.0, 3)
+        kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 4, 2)
+        kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 0.8, 100)
+      } else if (selectedDateRange === 'Mayo 2026') {
+        kpis.coverageRate = Math.min(kpis.coverageRate + 2.8, 100)
+        kpis.timeDeviation = Math.max(kpis.timeDeviation - 0.5, 3)
+        kpis.criticalAlerts = Math.max(kpis.criticalAlerts * 15, 8)
+        kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness + 1.2, 100)
+      } else if (selectedDateRange === 'Personalizado') {
+        kpis.coverageRate = Math.min(kpis.coverageRate - 1.2, 100)
+        kpis.timeDeviation = Math.max(kpis.timeDeviation + 0.9, 3)
+        kpis.criticalAlerts = Math.max(kpis.criticalAlerts + 3, 2)
+        kpis.visitEffectiveness = Math.min(kpis.visitEffectiveness - 0.5, 100)
+      }
     }
 
     // Apply Zone filters
@@ -214,6 +303,7 @@ export default function ControlTowerDashboard() {
 
     return { kpis, analytics }
   })()
+
 
   const loadData = async () => {
     try {
