@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/mapbox'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,9 @@ const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number 
   'La Paz': { lat: -16.5000, lng: -68.1500, zoom: 12 },
 }
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+
 export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorkerId, onSelectWorkerId }: LiveMapProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<L.Map | null>(null)
   const [animationTime, setAnimationTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
   const [speedMultiplier, setSpeedMultiplier] = useState(1)
@@ -37,14 +37,21 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const [showMayorista, setShowMayorista] = useState(true)
   const [showDetallista, setShowDetallista] = useState(true)
   const [showWorkers, setShowWorkers] = useState(true)
+  
+  const [viewState, setViewState] = useState({
+    longitude: -63.1812,
+    latitude: -17.7862,
+    zoom: 12,
+    pitch: 45,
+    bearing: 0
+  })
 
-  // Get associated cities dynamically from the PDVs list
+  const [routeGeometry, setRouteGeometry] = useState<any>(null)
+
   const associatedCities = Array.from(new Set(pdvs.map(p => p.city).filter(Boolean))) as string[]
   const sortedCities = ['Todas', ...associatedCities.sort()]
-
   const [selectedCity, setSelectedCity] = useState<string>('Todas')
 
-  // Sync selectedCity when a worker is selected
   useEffect(() => {
     if (selectedWorkerId) {
       const worker = reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId)
@@ -62,9 +69,17 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         setSelectedWorkerId(null)
       }
     }
+    
+    if (city !== 'Todas' && CITY_COORDINATES[city]) {
+      setViewState(prev => ({
+        ...prev,
+        longitude: CITY_COORDINATES[city].lng,
+        latitude: CITY_COORDINATES[city].lat,
+        zoom: CITY_COORDINATES[city].zoom
+      }))
+    }
   }
 
-  // Filter active reponedores by city
   const activeReponedores = reponedores.filter(w => {
     if (w.status === 'Completado') return false
     if (selectedCity !== 'Todas' && w.city !== selectedCity) return false
@@ -75,7 +90,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     ? reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId) ?? null
     : null
 
-  // Update animation phase for moving worker markers
   useEffect(() => {
     if (!isPlaying) return
     const timer = setInterval(() => {
@@ -92,332 +106,70 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     }
   }
 
-  // Cleanup map instance on component unmount
+  const activeWorkers = selectedWorker ? [selectedWorker] : (showWorkers ? activeReponedores : [])
+  const activePdvIds = new Set<string>()
+  activeWorkers.forEach(w => (w.sequence || []).forEach((id: string) => activePdvIds.add(id)))
+  
+  const visitedPdvIds = new Set<string>(pdvs.filter(p => p.visited).map(p => p.id))
+
+  const pdvsToRender = (selectedWorker
+    ? pdvs.filter(p => activePdvIds.has(p.id))
+    : pdvs
+  ).filter(p => {
+    if (selectedCity !== 'Todas' && p.city !== selectedCity) return false
+    if (p.type === 'Pareto' && !showPareto) return false
+    if (p.type === 'Mayorista' && !showMayorista) return false
+    if (p.type === 'Detallista' && !showDetallista) return false
+    return true
+  })
+
+  // Fetch Real Mapbox Directions Route
   useEffect(() => {
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove()
-        mapInstanceRef.current = null
-      }
+    if (!selectedWorker || !MAPBOX_TOKEN || MAPBOX_TOKEN === 'PEGA_TU_TOKEN_AQUI') {
+      setRouteGeometry(null)
+      return
     }
-  }, [])
 
-  // Pan and zoom map when selectedCity changes
-  useEffect(() => {
-    const map = mapInstanceRef.current
-    if (!map) return
+    const sequence: string[] = selectedWorker.sequence || []
+    const coords = sequence.map(id => {
+      const p = pdvs.find(x => x.id === id)
+      return p ? `${p.lng},${p.lat}` : null
+    }).filter(Boolean)
 
-    if (selectedCity === 'Todas') {
-      if (pdvs.length > 0) {
-        const points = pdvs.map(p => [p.lat, p.lng] as L.LatLngTuple)
-        try {
-          map.fitBounds(L.latLngBounds(points), { padding: [30, 30] })
-        } catch (_) {}
-      } else {
-        map.setView([-17.0, -65.0], 6)
-      }
+    if (coords.length > 1 && coords.length <= 25) { // Mapbox Directions API limit is 25 waypoints
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords.join(';')}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
+      
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.routes && data.routes[0]) {
+            setRouteGeometry(data.routes[0].geometry)
+          }
+        })
+        .catch(err => console.error("Error fetching route:", err))
     } else {
-      const coords = CITY_COORDINATES[selectedCity]
-      if (coords) {
-        map.setView([coords.lat, coords.lng], coords.zoom)
-      }
+       setRouteGeometry(null)
     }
-  }, [selectedCity])
+  }, [selectedWorker, pdvs])
 
-  // Sync markers when pdvs, reponedores, animationTime, or selectedWorkerId changes
-  useEffect(() => {
-    if (!mapContainerRef.current) return
+  // Fallback straight lines route layer if no real geometry
+  const fallbackRouteSource = useMemo(() => {
+     if (routeGeometry || !selectedWorker) return null;
+     const sequence: string[] = selectedWorker.sequence || []
+     const coords = sequence.map(id => {
+        const p = pdvs.find(x => x.id === id)
+        return p ? [p.lng, p.lat] : null
+     }).filter(Boolean) as number[][]
 
-    // 1. Initialize Map
-    if (!mapInstanceRef.current) {
-      let centerLat = -17.3895
-      let centerLng = -66.1568
-      let zoom = 11
-
-      if (selectedCity !== 'Todas') {
-        const coords = CITY_COORDINATES[selectedCity]
-        if (coords) {
-          centerLat = coords.lat
-          centerLng = coords.lng
-          zoom = coords.zoom
+     return {
+        type: 'Feature' as const,
+        geometry: {
+           type: 'LineString' as const,
+           coordinates: coords
         }
-      } else {
-        centerLat = -17.0
-        centerLng = -65.0
-        zoom = 6
-      }
+     }
+  }, [selectedWorker, pdvs, routeGeometry])
 
-      const map = L.map(mapContainerRef.current, {
-        zoomControl: true,
-        scrollWheelZoom: true,
-      }).setView([centerLat, centerLng], zoom)
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contribuyentes'
-      }).addTo(map)
-
-      mapInstanceRef.current = map
-    }
-
-    const map = mapInstanceRef.current
-    const markerGroup = L.layerGroup().addTo(map)
-
-    // ── Determine which workers & PDVs to render ───────────────────────────────
-    const activeWorkers = selectedWorker ? [selectedWorker] : (showWorkers ? activeReponedores : [])
-    const routeColors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6']
-
-    // Build a set of PDV IDs that are in the active worker(s) sequences
-    const activePdvIds = new Set<string>()
-    activeWorkers.forEach(w => (w.sequence || []).forEach((id: string) => activePdvIds.add(id)))
-
-    // Build visited PDV ids set (from all workers, but cross-reference pdv.visited)
-    const visitedPdvIds = new Set<string>(
-      pdvs.filter(p => p.visited).map(p => p.id)
-    )
-
-    // ── Determine progress index for selected worker ───────────────────────────
-    // visitedCount = how many PDVs in the sequence are marked as visited
-    const getVisitedCount = (worker: any) => {
-      const seq: string[] = worker.sequence || []
-      return seq.filter((id: string) => visitedPdvIds.has(id)).length
-    }
-
-    // ── 3. Render PDVs ─────────────────────────────────────────────────────────
-    const pdvsToRender = (selectedWorker
-      ? pdvs.filter(p => activePdvIds.has(p.id))
-      : pdvs
-    ).filter(p => {
-      if (selectedCity !== 'Todas' && p.city !== selectedCity) return false
-      if (p.type === 'Pareto' && !showPareto) return false
-      if (p.type === 'Mayorista' && !showMayorista) return false
-      if (p.type === 'Detallista' && !showDetallista) return false
-      return true
-    })
-
-    pdvsToRender.forEach((pdv) => {
-      const isInRoute = activePdvIds.has(pdv.id)
-      const isVisited = visitedPdvIds.has(pdv.id)
-
-      // In filtered mode: visited = bright filled, pending = dimmed outline
-      // In full mode: normal category color
-      let fillColor: string
-      let fillOpacity: number
-      let radius: number
-      let strokeColor: string
-      let strokeWeight: number
-
-      if (selectedWorker) {
-        if (isVisited) {
-          // Bright green with checkmark feel
-          fillColor = '#10b981'
-          fillOpacity = 0.95
-          radius = 8
-          strokeColor = '#ffffff'
-          strokeWeight = 2.5
-        } else {
-          // Pending — muted category color
-          fillColor = getPDVColor(pdv.type)
-          fillOpacity = 0.3
-          radius = 6
-          strokeColor = '#94a3b8'
-          strokeWeight = 1
-        }
-      } else {
-        fillColor = getPDVColor(pdv.type)
-        fillOpacity = 0.75
-        radius = 5
-        strokeColor = '#ffffff'
-        strokeWeight = 1.5
-      }
-
-      const marker = L.circleMarker([pdv.lat, pdv.lng], {
-        radius,
-        fillColor,
-        color: strokeColor,
-        weight: strokeWeight,
-        opacity: 0.9,
-        fillOpacity,
-      })
-
-      // Sequence badge only in filtered route view
-      if (selectedWorker) {
-        const seq: string[] = selectedWorker.sequence || []
-        const seqIdx = seq.indexOf(pdv.id)
-        if (seqIdx !== -1) {
-          const label = isVisited ? `✓` : `${seqIdx + 1}`
-          marker.bindTooltip(label, {
-            permanent: true,
-            direction: 'top',
-            className: isVisited ? 'pdv-sequence-badge pdv-visited-badge' : 'pdv-sequence-badge',
-            offset: [0, -3]
-          })
-        }
-      } else {
-        // Show sequence number from any worker
-        for (const worker of reponedores) {
-          const seq = worker.sequence || []
-          const idx = seq.indexOf(pdv.id)
-          if (idx !== -1) {
-            marker.bindTooltip(`${idx + 1}`, {
-              permanent: true,
-              direction: 'top',
-              className: 'pdv-sequence-badge',
-              offset: [0, -3]
-            })
-            break
-          }
-        }
-      }
-
-      marker.bindPopup(`
-        <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #1f2937;">
-          <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #111827;">${pdv.nombre}</h4>
-          <div style="margin-bottom: 2px;"><strong>ID:</strong> ${pdv.id}</div>
-          <div style="margin-bottom: 2px;"><strong>Clasificación:</strong> ${pdv.type}</div>
-          <div><strong>Estado:</strong> ${isVisited ? '✅ Visitado' : '⏳ Pendiente'}</div>
-        </div>
-      `)
-
-      marker.addTo(markerGroup)
-    })
-
-    // ── 4. Render Route Polylines ──────────────────────────────────────────────
-    activeWorkers.forEach((worker, idx) => {
-      const sequence: string[] = worker.sequence || []
-      if (sequence.length <= 1) return
-
-      const visitedCount = getVisitedCount(worker)
-
-      // Split polyline into visited (solid) and pending (dashed)
-      const allCoords: L.LatLngTuple[] = []
-      sequence.forEach((pdvId: string) => {
-        const pdv = pdvs.find(p => p.id === pdvId)
-        if (pdv && typeof pdv.lat === 'number' && typeof pdv.lng === 'number' && !isNaN(pdv.lat) && !isNaN(pdv.lng)) {
-          allCoords.push([pdv.lat, pdv.lng])
-        }
-      })
-
-      if (allCoords.length <= 1) return
-
-      const color = routeColors[idx % routeColors.length]
-
-      if (selectedWorker) {
-        // Visited segment — solid bright line
-        const visitedCoords = allCoords.slice(0, Math.max(1, visitedCount + 1))
-        if (visitedCoords.length > 1) {
-          L.polyline(visitedCoords, {
-            color: '#10b981',
-            weight: 4,
-            opacity: 0.9,
-            dashArray: undefined,
-          }).bindTooltip(`Tramo recorrido — ${worker.name}`, { sticky: true })
-            .addTo(markerGroup)
-        }
-
-        // Pending segment — dashed dim line
-        const pendingCoords = allCoords.slice(Math.max(0, visitedCount))
-        if (pendingCoords.length > 1) {
-          L.polyline(pendingCoords, {
-            color: '#64748b',
-            weight: 2,
-            opacity: 0.4,
-            dashArray: '6 8',
-          }).bindTooltip(`Tramo pendiente — ${worker.name}`, { sticky: true })
-            .addTo(markerGroup)
-        }
-      } else {
-        // Full view — single uniform dashed line per worker
-        L.polyline(allCoords, {
-          color,
-          weight: 2.5,
-          opacity: 0.4,
-          dashArray: '5, 8'
-        }).bindTooltip(`Ruta de ${worker.name}`, { sticky: true })
-          .addTo(markerGroup)
-      }
-    })
-
-    // ── 5. Render Active Workers with Simulated Movement ──────────────────────
-    activeWorkers.forEach((worker) => {
-      const sequence: string[] = worker.sequence || []
-      const totalCount = sequence.length
-
-      let lat = worker.lat
-      let lng = worker.lng
-
-      if (totalCount > 1) {
-        const visitedCount = Math.round((worker.routeProgress / 100) * totalCount)
-        const prevPdvId = sequence[Math.max(0, visitedCount - 1)]
-        const nextPdvId = sequence[Math.min(totalCount - 1, visitedCount)]
-        const prevPdv = pdvs.find(p => p.id === prevPdvId)
-        const nextPdv = pdvs.find(p => p.id === nextPdvId)
-
-        if (prevPdv && nextPdv && prevPdv.id !== nextPdv.id) {
-          lat = prevPdv.lat + (nextPdv.lat - prevPdv.lat) * animationTime
-          lng = prevPdv.lng + (nextPdv.lng - prevPdv.lng) * animationTime
-        } else if (prevPdv) {
-          lat = prevPdv.lat
-          lng = prevPdv.lng
-        }
-      }
-
-      // Safe fallback for coordinates if undefined or invalid (e.g. in mock/empty state)
-      if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
-        const fallbackPdv = pdvs.find(p => p.id === worker.currentPDV)
-        if (fallbackPdv && typeof fallbackPdv.lat === 'number' && typeof fallbackPdv.lng === 'number' && !isNaN(fallbackPdv.lat) && !isNaN(fallbackPdv.lng)) {
-          lat = fallbackPdv.lat
-          lng = fallbackPdv.lng
-        } else {
-          const wCity = worker.city || 'Santa Cruz'
-          const cityCoords = {
-            'Cochabamba': { lat: -17.3895, lng: -66.1568 },
-            'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
-            'La Paz': { lat: -16.5000, lng: -68.1500 }
-          }
-          const coords = cityCoords[wCity as keyof typeof cityCoords] || cityCoords['Santa Cruz']
-          lat = coords.lat
-          lng = coords.lng
-        }
-      }
-
-      const isDelayed = worker.status === 'Retrasado'
-      const workerColor = isDelayed ? '#ef4444' : '#10b981'
-
-      const workerMarker = L.circleMarker([lat, lng], {
-        radius: 10,
-        fillColor: workerColor,
-        color: '#ffffff',
-        weight: 2.5,
-        opacity: 1,
-        fillOpacity: 0.95,
-      })
-
-      workerMarker.bindPopup(`
-        <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #1f2937; min-width: 160px;">
-          <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: ${isDelayed ? '#dc2626' : '#047857'};">${worker.name}</h4>
-          <div style="margin-bottom: 2px;"><strong>Estado:</strong> ${worker.status}</div>
-          <div style="background:#f3f4f6;border-radius:4px;padding:4px 6px;font-weight:500;margin-top:4px;">
-            Progreso: ${worker.routeProgress.toFixed(0)}% completado
-          </div>
-          ${worker.delay > 0 ? `<div style="margin-top:4px;color:#dc2626;font-weight:bold;">⚠️ Retraso: ${worker.delay.toFixed(0)} min</div>` : ''}
-        </div>
-      `)
-      workerMarker.addTo(markerGroup)
-    })
-
-    // ── 6. Auto-zoom to selected worker's route ───────────────────────────────
-    if (selectedWorker && activePdvIds.size > 0) {
-      const points: L.LatLngTuple[] = []
-      pdvs.forEach(p => { if (activePdvIds.has(p.id)) points.push([p.lat, p.lng]) })
-      if (points.length > 0) {
-        try { map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 }) } catch (_) {}
-      }
-    }
-
-    return () => { markerGroup.remove() }
-  }, [pdvs, reponedores, animationTime, selectedWorkerId, showPareto, showMayorista, showDetallista, showWorkers, selectedCity])
-
-  // Build ordered PDV list for selected worker's sidebar detail
   const workerSequencePdvs: Array<PDV & { seqIndex: number }> = selectedWorker
     ? (selectedWorker.sequence || [])
         .map((id: string, i: number) => {
@@ -427,15 +179,15 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         .filter(Boolean)
     : []
 
+  const isTokenValid = MAPBOX_TOKEN && MAPBOX_TOKEN !== 'PEGA_TU_TOKEN_AQUI'
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      {/* Map Container */}
       <Card className="lg:col-span-3 border-border shadow-sm">
         <CardHeader className="p-3 pb-1 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
           <div className="flex flex-wrap items-center gap-3 min-w-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider shrink-0">Mapa de Operaciones de Campo en Vivo</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider shrink-0">Mapa Interactivo (Mapbox GL)</CardTitle>
             
-            {/* City Selector */}
             <div className="flex items-center gap-1.5 shrink-0">
               <select
                 value={selectedCity}
@@ -465,7 +217,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
             )}
           </div>
 
-          {/* Simulation Playback Controls */}
           <div className="flex items-center gap-2 bg-muted/60 p-1.5 rounded-lg border border-border shrink-0">
             <Button
               size="sm"
@@ -502,43 +253,144 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         </CardHeader>
 
         <CardContent className="p-3 pt-0">
-          <div className="bg-slate-100 rounded-lg overflow-hidden relative h-[390px] w-full border border-border">
-            <div ref={mapContainerRef} className="h-full w-full z-0" />
-
-            {/* Legend (Only route legend when worker is focused) */}
-            {selectedWorker && (
-              <div className="absolute bottom-4 right-4 z-[400] bg-card/95 backdrop-blur-sm border border-border p-3 rounded-lg shadow-lg max-w-[200px] text-xs space-y-2 pointer-events-auto">
-                <h5 className="font-semibold text-foreground/90 border-b border-border pb-1 mb-1.5 uppercase tracking-wider text-[9px]">
-                  Ruta — {selectedWorker.name}
-                </h5>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
-                    <span className="text-foreground/80 font-medium">PDV Visitado ✓</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-slate-400 border border-slate-300 opacity-50" />
-                    <span className="text-foreground/80 font-medium">PDV Pendiente</span>
-                  </div>
-                  <div className="border-t border-border pt-1.5 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-6 rounded bg-emerald-500" />
-                      <span className="text-foreground/70">Tramo recorrido</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-6 rounded bg-slate-400 opacity-50" style={{ backgroundImage: 'repeating-linear-gradient(90deg,#94a3b8 0,#94a3b8 4px,transparent 4px,transparent 8px)' }} />
-                      <span className="text-foreground/70">Tramo pendiente</span>
-                    </div>
-                  </div>
-                </div>
+          <div className="bg-slate-100 rounded-lg overflow-hidden relative h-[450px] w-full border border-border">
+            {!isTokenValid && (
+              <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm text-white p-6 text-center">
+                <h3 className="text-xl font-bold text-rose-500 mb-2">Falta Mapbox Token</h3>
+                <p className="text-sm text-slate-300 max-w-md">Para visualizar el mapa 3D y trazar rutas, necesitas proveer un token de Mapbox en el archivo <code className="bg-slate-800 px-2 py-1 rounded">.env.local</code>.</p>
               </div>
             )}
 
-            {/* Selected worker filter banner */}
+            {isTokenValid && (
+              <Map
+                {...viewState}
+                onMove={evt => setViewState(evt.viewState)}
+                mapStyle="mapbox://styles/mapbox/dark-v11"
+                mapboxAccessToken={MAPBOX_TOKEN}
+                interactive={true}
+              >
+                <NavigationControl position="top-right" />
+
+                {/* Render Selected Route */}
+                {selectedWorker && routeGeometry && (
+                  <Source id="real-route" type="geojson" data={{ type: 'Feature', geometry: routeGeometry, properties: {} }}>
+                    <Layer
+                      id="route-line"
+                      type="line"
+                      paint={{
+                        'line-color': '#10b981',
+                        'line-width': 4,
+                        'line-opacity': 0.8
+                      }}
+                    />
+                  </Source>
+                )}
+
+                {/* Fallback Straight Line Route */}
+                {selectedWorker && !routeGeometry && fallbackRouteSource && (
+                  <Source id="fallback-route" type="geojson" data={fallbackRouteSource}>
+                     <Layer
+                        id="fallback-line"
+                        type="line"
+                        paint={{
+                           'line-color': '#64748b',
+                           'line-width': 3,
+                           'line-dasharray': [2, 2],
+                           'line-opacity': 0.8
+                        }}
+                     />
+                  </Source>
+                )}
+
+                {/* Render PDVs */}
+                {pdvsToRender.map(pdv => {
+                  const isVisited = visitedPdvIds.has(pdv.id)
+                  const isInRoute = activePdvIds.has(pdv.id)
+                  
+                  let bg = getPDVColor(pdv.type)
+                  let size = 12
+                  let opacity = 0.8
+
+                  if (selectedWorker) {
+                     if (isVisited) {
+                        bg = '#10b981'
+                        size = 16
+                     } else if (!isInRoute) {
+                        opacity = 0.3
+                     }
+                  }
+
+                  return (
+                    <Marker key={pdv.id} longitude={pdv.lng} latitude={pdv.lat} anchor="center">
+                      <div
+                        style={{
+                          backgroundColor: bg,
+                          width: size,
+                          height: size,
+                          borderRadius: '50%',
+                          border: '2px solid white',
+                          opacity: opacity,
+                          cursor: 'pointer',
+                          boxShadow: '0 0 10px rgba(0,0,0,0.5)'
+                        }}
+                        title={`${pdv.nombre} - ${pdv.type}`}
+                      />
+                    </Marker>
+                  )
+                })}
+
+                {/* Render Active Workers (Simulation) */}
+                {activeWorkers.map(worker => {
+                  const sequence: string[] = worker.sequence || []
+                  const totalCount = sequence.length
+            
+                  let lat = worker.lat
+                  let lng = worker.lng
+            
+                  if (totalCount > 1) {
+                    const visitedCount = Math.round((worker.routeProgress / 100) * totalCount)
+                    const prevPdvId = sequence[Math.max(0, visitedCount - 1)]
+                    const nextPdvId = sequence[Math.min(totalCount - 1, visitedCount)]
+                    const prevPdv = pdvs.find(p => p.id === prevPdvId)
+                    const nextPdv = pdvs.find(p => p.id === nextPdvId)
+            
+                    if (prevPdv && nextPdv && prevPdv.id !== nextPdv.id) {
+                      lat = prevPdv.lat + (nextPdv.lat - prevPdv.lat) * animationTime
+                      lng = prevPdv.lng + (nextPdv.lng - prevPdv.lng) * animationTime
+                    } else if (prevPdv) {
+                      lat = prevPdv.lat
+                      lng = prevPdv.lng
+                    }
+                  }
+
+                  const isDelayed = worker.status === 'Retrasado'
+                  const workerColor = isDelayed ? '#ef4444' : '#10b981'
+
+                  if (isNaN(lat) || isNaN(lng)) return null;
+
+                  return (
+                    <Marker key={`worker-${worker.id}`} longitude={lng} latitude={lat} anchor="bottom">
+                      <div className="flex flex-col items-center">
+                         <div className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md mb-1" style={{ color: workerColor }}>
+                            {worker.name}
+                         </div>
+                         <div style={{
+                            width: 20, height: 20, backgroundColor: workerColor,
+                            borderRadius: '50%', border: '3px solid white',
+                            boxShadow: '0 0 15px rgba(0,0,0,0.6)',
+                            animation: isPlaying ? 'pulse 2s infinite' : 'none'
+                         }} />
+                      </div>
+                    </Marker>
+                  )
+                })}
+              </Map>
+            )}
+
             {selectedWorker && (
               <div className="absolute top-3 left-3 z-[400] bg-primary/90 backdrop-blur-sm text-primary-foreground text-[11px] font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                Mostrando ruta de {selectedWorker.name} · {workerSequencePdvs.filter(p => p.visited).length}/{workerSequencePdvs.length} PDVs visitados
+                Mostrando ruta real de {selectedWorker.name}
                 <button onClick={() => setSelectedWorkerId(null)} className="ml-1 hover:opacity-70 transition-opacity">
                   <X className="h-3 w-3" />
                 </button>
@@ -600,28 +452,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         </CardContent>
       </Card>
 
-      <style>{`
-        .pdv-sequence-badge {
-          background: #1e293b !important;
-          border: 1px solid #475569 !important;
-          color: #f8fafc !important;
-          font-weight: 700 !important;
-          font-size: 9px !important;
-          padding: 1px 4px !important;
-          border-radius: 4px !important;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important;
-          opacity: 0.95 !important;
-          pointer-events: none;
-        }
-        .pdv-visited-badge {
-          background: #059669 !important;
-          border: 1px solid #10b981 !important;
-          color: #ffffff !important;
-          font-size: 10px !important;
-        }
-      `}</style>
-
-      {/* Right Sidebar — Worker list OR sequence detail */}
       <Card className="border-border shadow-sm">
         <CardHeader className="p-3 pb-1">
           <div className="flex items-center justify-between">
@@ -645,11 +475,10 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         </CardHeader>
 
         <CardContent className="p-3 pt-0">
-          {/* ── Full list view ── */}
           {!selectedWorker && (
-            <div className="space-y-2 max-h-[390px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-2">
-                Clic para ver ruta individual
+                Clic para ver ruta real
               </p>
               {activeReponedores.map((worker) => {
                 const workerId = worker.dbUuid || worker.id
@@ -683,7 +512,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                       )}
                     </div>
 
-                    {/* Progress bar */}
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
@@ -699,10 +527,8 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
             </div>
           )}
 
-          {/* ── Route detail view (selected worker) ── */}
           {selectedWorker && (
-            <div className="space-y-1 max-h-[390px] overflow-y-auto pr-1">
-              {/* Progress summary */}
+            <div className="space-y-1 max-h-[450px] overflow-y-auto pr-1">
               <div className="mb-3 p-3 bg-muted/30 rounded-lg border border-border">
                 <div className="flex items-center justify-between mb-1.5 text-xs">
                   <span className="text-muted-foreground">Progreso general</span>
@@ -720,13 +546,8 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                     }}
                   />
                 </div>
-                <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
-                  <span className="flex items-center gap-1"><span className="text-emerald-400">●</span> {workerSequencePdvs.filter(p => p.visited).length} visitados</span>
-                  <span className="flex items-center gap-1"><span className="text-slate-400">●</span> {workerSequencePdvs.filter(p => !p.visited).length} pendientes</span>
-                </div>
               </div>
 
-              {/* Ordered stop list */}
               {workerSequencePdvs.map((pdv, idx) => {
                 const isNext = !pdv.visited && workerSequencePdvs.slice(0, idx).every(p => p.visited)
                 return (
@@ -741,7 +562,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                         : 'bg-muted/20 border-border/50 opacity-60',
                     ].join(' ')}
                   >
-                    {/* Step number / check */}
                     <div className={[
                       'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
                       pdv.visited
@@ -762,7 +582,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                       </p>
                     </div>
 
-                    {/* Category dot */}
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: getPDVColor(pdv.type), opacity: pdv.visited ? 0.5 : 1 }}
@@ -770,10 +589,6 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                   </div>
                 )
               })}
-
-              {workerSequencePdvs.length === 0 && (
-                <p className="text-sm text-muted-foreground py-6 text-center">Sin PDVs asignados en la secuencia.</p>
-              )}
             </div>
           )}
         </CardContent>

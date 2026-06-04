@@ -12,7 +12,10 @@ import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
 import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan, addPdvToRoute, removePdvFromRoute, getRoutesPlanForDate, publishRoutesPlanForDate } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
+import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface PhotoEvidence {
   id: string
@@ -88,7 +91,7 @@ function PhotoPanel({
   )
 }
 
-// ─── Route History Map Modal (Client-side Leaflet) ──────────────────────────
+// ─── Route History Map Modal (Client-side Mapbox) ──────────────────────────
 function RouteHistoryMapModal({
   isOpen,
   onClose,
@@ -102,97 +105,38 @@ function RouteHistoryMapModal({
   sequence: string[]
   pdvs: any[]
 }) {
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
+  const [viewState, setViewState] = useState({
+    longitude: -63.1812,
+    latitude: -17.7862,
+    zoom: 12
+  })
 
   useEffect(() => {
-    if (!isOpen) return
-
-    let mapInstance: any = null
-    let active = true
-
-    import('leaflet').then((LModule) => {
-      if (!active) return
-      const L = LModule.default
-
-      if (!mapContainerRef.current) return
-
-      // Initialize map
-      const map = L.map(mapContainerRef.current, {
-        zoomControl: true,
-        scrollWheelZoom: true,
-      }).setView([-34.61, -58.44], 12)
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      }).addTo(map)
-
-      mapInstance = map
-      mapRef.current = map
-
-      const markerGroup = L.layerGroup().addTo(map)
-
-      // Build coordinates and draw markers
-      const points: L.LatLngTuple[] = []
-      sequence.forEach((pdvId, idx) => {
-        const pdv = pdvs.find(p => p.id === pdvId)
-        if (pdv) {
-          const lat = parseFloat(pdv.lat)
-          const lng = parseFloat(pdv.lng)
-          points.push([lat, lng])
-
-          // Add circle marker for each stop
-          const marker = L.circleMarker([lat, lng], {
-            radius: 8,
-            fillColor: '#10b981', // green for completed
-            color: '#ffffff',
-            weight: 2,
-            opacity: 0.9,
-            fillOpacity: 0.95,
-          }).addTo(markerGroup)
-
-          // Bind stop sequence number
-          marker.bindTooltip(`${idx + 1}`, {
-            permanent: true,
-            direction: 'top',
-            className: 'pdv-sequence-badge pdv-visited-badge',
-            offset: [0, -3]
-          })
-
-          marker.bindPopup(`
-            <div style="font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.4; color: #1f2937;">
-              <h4 style="margin:0 0 3px 0;font-size:13px;font-weight:700;color:#111827;">${pdv.nombre || pdv.name}</h4>
-              <div>Parada #${idx + 1} · ${pdv.type}</div>
-              <div style="color:#059669;font-weight:bold;margin-top:2px;">✓ Completado</div>
-            </div>
-          `)
-        }
-      })
-
-      // Draw route polyline
-      if (points.length > 1) {
-        L.polyline(points, {
-          color: '#10b981',
-          weight: 4,
-          opacity: 0.85,
-        }).addTo(markerGroup)
-
-        // Fit bounds
-        try {
-          map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 })
-        } catch (_) { }
-      }
-    })
-
-    return () => {
-      active = false
-      if (mapInstance) {
-        mapInstance.remove()
+    if (isOpen && sequence.length > 0 && pdvs.length > 0) {
+      const firstPdv = pdvs.find(p => p.id === sequence[0])
+      if (firstPdv && firstPdv.lng !== undefined && firstPdv.lat !== undefined) {
+        setViewState({
+          longitude: Number(firstPdv.lng),
+          latitude: Number(firstPdv.lat),
+          zoom: 13
+        })
       }
     }
   }, [isOpen, sequence, pdvs])
 
   if (!isOpen) return null
+
+  const coords = sequence.map(id => {
+    const p = pdvs.find(x => x.id === id)
+    return p && p.lng !== undefined && p.lat !== undefined ? [Number(p.lng), Number(p.lat)] : null
+  }).filter(Boolean) as number[][]
+
+  const routeGeoJSON = coords.length > 1 ? {
+    type: 'Feature' as const,
+    geometry: { type: 'LineString' as const, coordinates: coords }
+  } : null
+
+  const isTokenValid = MAPBOX_TOKEN && MAPBOX_TOKEN !== 'PEGA_TU_TOKEN_AQUI'
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
@@ -216,7 +160,44 @@ function RouteHistoryMapModal({
         </CardHeader>
         <CardContent className="p-0 border-t border-border">
           <div className="bg-slate-100 h-[420px] w-full relative">
-            <div ref={mapContainerRef} className="h-full w-full z-0" />
+            {!isTokenValid ? (
+              <div className="flex h-full flex-col items-center justify-center bg-black/80 text-white p-6 text-center">
+                <h3 className="text-xl font-bold text-rose-500 mb-2">Falta Mapbox Token</h3>
+                <p className="text-sm text-slate-300">Añade tu token en .env.local para visualizar rutas.</p>
+              </div>
+            ) : (
+              <Map
+                {...viewState}
+                onMove={evt => setViewState(evt.viewState)}
+                mapStyle="mapbox://styles/mapbox/dark-v11"
+                mapboxAccessToken={MAPBOX_TOKEN}
+              >
+                {routeGeoJSON && (
+                  <Source id="history-route" type="geojson" data={routeGeoJSON}>
+                    <Layer
+                      id="history-line"
+                      type="line"
+                      paint={{
+                        'line-color': '#10b981',
+                        'line-width': 4,
+                        'line-opacity': 0.85
+                      }}
+                    />
+                  </Source>
+                )}
+                {sequence.map((pdvId, idx) => {
+                  const pdv = pdvs.find(p => p.id === pdvId)
+                  if (!pdv || pdv.lng === undefined || pdv.lat === undefined) return null;
+                  return (
+                    <Marker key={pdvId} longitude={Number(pdv.lng)} latitude={Number(pdv.lat)}>
+                      <div className="w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-md">
+                        {idx + 1}
+                      </div>
+                    </Marker>
+                  )
+                })}
+              </Map>
+            )}
           </div>
         </CardContent>
       </Card>
