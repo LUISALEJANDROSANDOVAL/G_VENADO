@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import {
   AlertTriangle, Zap, Check, Loader2, History, ChevronDown, ChevronRight,
   Camera, Clock, User, Store, MapPin, X, ArrowRight, Route, SlidersHorizontal,
-  Calendar, Send
+  Calendar, Send, GripVertical
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
-import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getTomorrowRoutesPlan, publishTomorrowRoutesPlan, addPdvToRoute, removePdvFromRoute, getRoutesPlanForDate, publishRoutesPlanForDate } from '@/app/actions'
+import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getRoutesPlanForDate, publishRoutesPlanForDate, addPdvToRoute, removePdvFromRoute } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
 import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
@@ -495,6 +495,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [isPublishingTomorrow, setIsPublishingTomorrow] = useState(false)
   const [tomorrowPlans, setTomorrowPlans] = useState<any[] | null>(null)
   const [isLoadingTomorrow, setIsLoadingTomorrow] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   // Load tomorrow's plan from Supabase
   useEffect(() => {
@@ -521,7 +522,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       }
       fetchTomorrowPlan()
     }
-  }, [activeTab, planningDateStr])
+  }, [activeTab, planningDateStr, refreshTrigger])
 
   // Date state for history audit
   const [selectedHistoryDate, setSelectedHistoryDate] = useState('2026-05-31')
@@ -534,72 +535,56 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [isAssigningWorker, setIsAssigningWorker] = useState<string | null>(null)
 
   // Tomorrow stops drag & drop reorder states
-  const [draggingIndex, setDraggingIndex] = useState<{ workerId: string; index: number } | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<{ workerId: string; index: number } | null>(null)
+  const [draggingIndex, setDraggingIndex] = useState<{ workerId: string, idx: number } | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<{ workerId: string, idx: number } | null>(null)
 
-  const handleDragStart = (e: React.DragEvent, workerId: string, index: number) => {
-    setDraggingIndex({ workerId, index })
-    e.dataTransfer.effectAllowed = 'move'
+  const handleDragStart = (workerId: string, idx: number) => {
+    setDraggingIndex({ workerId, idx })
   }
 
-  const handleDragOver = (e: React.DragEvent, workerId: string, index: number) => {
-    e.preventDefault()
-    if (draggingIndex && draggingIndex.workerId === workerId) {
-      setDragOverIndex({ workerId, index })
-    }
-  }
-
-  const handleDrop = async (e: React.DragEvent, workerId: string, targetIndex: number) => {
+  const handleDragOver = (e: React.DragEvent, workerId: string, idx: number) => {
     e.preventDefault()
     if (!draggingIndex || draggingIndex.workerId !== workerId) return
-    
-    const sourceIndex = draggingIndex.index
-    if (sourceIndex === targetIndex) {
+    setDragOverIndex({ workerId, idx })
+  }
+
+  const handleDrop = async (workerId: string, idx: number) => {
+    if (!draggingIndex || draggingIndex.workerId !== workerId) {
       setDraggingIndex(null)
       setDragOverIndex(null)
       return
     }
 
-    const plan = tomorrowPlans?.find(p => p.reponedorId === workerId)
-    if (!plan) return
+    const { idx: fromIdx } = draggingIndex
+    const toIdx = idx
 
-    const newSequence = [...plan.sequence]
-    const [movedItem] = newSequence.splice(sourceIndex, 1)
-    newSequence.splice(targetIndex, 0, movedItem)
+    if (fromIdx !== toIdx && tomorrowPlans) {
+      const plans = [...tomorrowPlans]
+      const workerPlanIdx = plans.findIndex(p => p.reponedorId === workerId)
+      if (workerPlanIdx > -1) {
+        const plan = { ...plans[workerPlanIdx] }
+        const sequence = [...plan.sequence]
+        
+        // reorder
+        const [moved] = sequence.splice(fromIdx, 1)
+        sequence.splice(toIdx, 0, moved)
+        
+        plan.sequence = sequence
+        plans[workerPlanIdx] = plan
+        
+        setTomorrowPlans(plans)
 
-    // Update state locally
-    setTomorrowPlans(prev => prev ? prev.map(p => {
-      if (p.reponedorId === workerId) {
-        return { ...p, sequence: newSequence }
+        // auto-save the new sequence immediately (since user requested auto-save on drop)
+        try {
+          await publishRoutesPlanForDate(plans, planningDateStr)
+        } catch (err) {
+          console.error("Error auto-saving on drop", err)
+        }
       }
-      return p
-    }) : null)
+    }
 
     setDraggingIndex(null)
     setDragOverIndex(null)
-
-    // Save automatically if published
-    if (tomorrowPublished && tomorrowPlans) {
-      setIsReassigning(true)
-      try {
-        const updatedPlans = tomorrowPlans.map(p => {
-          if (p.reponedorId === workerId) {
-            return { ...p, sequence: newSequence }
-          }
-          return p
-        })
-        const res = await publishRoutesPlanForDate(updatedPlans, planningDateStr)
-        if ('error' in res && res.error) {
-          alert('Error al reordenar: ' + res.error)
-        } else {
-          if (onRefresh) onRefresh()
-        }
-      } catch (err: any) {
-        alert('Error al guardar reordenamiento: ' + err.message)
-      } finally {
-        setIsReassigning(false)
-      }
-    }
   }
 
   const toggleTomorrowCard = (reponedorId: string) => {
@@ -719,95 +704,85 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       })
     }
 
+    // Always update local state first (optimistic)
+    setTomorrowPlans(prev => prev ? prev.map(p => {
+      let seq = p.sequence
+      if (p.reponedorId === currentReponedorId) {
+        seq = seq.filter((id: string) => id !== pdvId)
+      }
+      if (p.reponedorId === targetReponedorId) {
+        if (!seq.includes(pdvId)) {
+          seq = [...seq, pdvId]
+        }
+      }
+      return { ...p, sequence: seq }
+    }) : null)
+
+    // If published, also save to server in background (no refresh)
     if (tomorrowPublished) {
-      setIsReassigning(true)
       try {
         const tomorrow = new Date()
         tomorrow.setDate(tomorrow.getDate() + 1)
         const tomorrowStr = tomorrow.toISOString().split('T')[0]
-        
         const res = await reassignPdv(pdvId, targetReponedorId, tomorrowStr)
         if ('error' in res && res.error) {
-          alert('Error al reasignar: ' + res.error)
-        } else {
-          if (onRefresh) onRefresh()
+          console.error('Error al reasignar:', res.error)
         }
       } catch (e: any) {
-        alert('Error: ' + e.message)
-      } finally {
-        setIsReassigning(false)
+        console.error('Error:', e.message)
       }
-    } else {
-      setTomorrowPlans(prev => prev ? prev.map(p => {
-        let seq = p.sequence
-        if (p.reponedorId === currentReponedorId) {
-          seq = seq.filter((id: string) => id !== pdvId)
-        }
-        if (p.reponedorId === targetReponedorId) {
-          if (!seq.includes(pdvId)) {
-            seq = [...seq, pdvId]
-          }
-        }
-        return { ...p, sequence: seq }
-      }) : null)
     }
   }
 
   const handleRemoveTomorrow = async (pdvId: string, reponedorId: string) => {
+    // Always update local state first (optimistic)
+    setTomorrowPlans(prev => prev ? prev.map(p => {
+      if (p.reponedorId === reponedorId) {
+        return { ...p, sequence: p.sequence.filter((id: string) => id !== pdvId) }
+      }
+      return p
+    }) : null)
+
+    // If published, also save to server in background (no refresh)
     if (tomorrowPublished) {
-      setIsReassigning(true)
       try {
         const tomorrow = new Date()
         tomorrow.setDate(tomorrow.getDate() + 1)
         const tomorrowStr = tomorrow.toISOString().split('T')[0]
         const res = await removePdvFromRoute(pdvId, reponedorId, tomorrowStr)
         if ('error' in res && res.error) {
-          alert('Error: ' + res.error)
-        } else {
-          if (onRefresh) onRefresh()
+          console.error('Error:', res.error)
         }
       } catch (e: any) {
-        alert('Error: ' + e.message)
-      } finally {
-        setIsReassigning(false)
+        console.error('Error:', e.message)
       }
-    } else {
-      setTomorrowPlans(prev => prev ? prev.map(p => {
-        if (p.reponedorId === reponedorId) {
-          return { ...p, sequence: p.sequence.filter((id: string) => id !== pdvId) }
-        }
-        return p
-      }) : null)
     }
   }
 
   const handleAddTomorrow = async (pdvId: string, reponedorId: string) => {
+    // Always update local state first (optimistic)
+    setTomorrowPlans(prev => prev ? prev.map(p => {
+      if (p.reponedorId === reponedorId) {
+        if (!p.sequence.includes(pdvId)) {
+          return { ...p, sequence: [...p.sequence, pdvId] }
+        }
+      }
+      return p
+    }) : null)
+
+    // If published, also save to server in background (no refresh)
     if (tomorrowPublished) {
-      setIsReassigning(true)
       try {
         const tomorrow = new Date()
         tomorrow.setDate(tomorrow.getDate() + 1)
         const tomorrowStr = tomorrow.toISOString().split('T')[0]
         const res = await addPdvToRoute(pdvId, reponedorId, tomorrowStr)
         if ('error' in res && res.error) {
-          alert('Error: ' + res.error)
-        } else {
-          if (onRefresh) onRefresh()
+          console.error('Error:', res.error)
         }
       } catch (e: any) {
-        alert('Error: ' + e.message)
-      } finally {
-        setIsReassigning(false)
+        console.error('Error:', e.message)
       }
-    } else {
-      setTomorrowPlans(prev => prev ? prev.map(p => {
-        if (p.reponedorId === reponedorId) {
-          if (!p.sequence.includes(pdvId)) {
-            return { ...p, sequence: [...p.sequence, pdvId] }
-          }
-        }
-        return p
-      }) : null)
     }
   }
 
@@ -1339,7 +1314,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
         </div>
       )}      {/* ══════════════════════ TAB 3: PLANIFICACIÓN DE MAÑANA ══════════════════════ */}
       {activeTab === 'tomorrow' && (
-        <div className="space-y-6 w-full animate-in fade-in duration-300">
+        <div className="space-y-6 w-full">
           {isLoadingTomorrow ? (
             <div className="py-20 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 bg-slate-500/5 rounded-xl border border-border border-dashed">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1505,7 +1480,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   const isExpanded = !!expandedTomorrowCards[p.reponedorId]
 
                   return (
-                    <div key={p.reponedorId} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-all duration-200">
+                    <div key={p.reponedorId} className="border border-border rounded-xl bg-card overflow-hidden shadow-sm transition-colors duration-200">
                       {/* Clickable Card Header */}
                       <div
                         role="button"
@@ -1595,7 +1570,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
                       {/* Card Content (Visible only when expanded) */}
                       {isExpanded && (
-                        <div className="px-5 py-4 space-y-4 animate-in fade-in duration-200">
+                        <div className="px-5 py-4 space-y-4">
                           {/* Horizontal Stop Sequence */}
                           <div className="space-y-2">
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
@@ -1603,22 +1578,22 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                               Secuencia Planificada de Paradas (Optimización TSP)
                             </h4>
                             
-                            <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50">
+                            <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/50 min-h-[120px]">
                               {p.sequence.map((pdvId: string, idx: number) => {
                                 const pdv = pdvs.find(pos => pos.id === pdvId)
                                 const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
                                 const isLast = idx === p.sequence.length - 1
-                                const isDragging = draggingIndex?.workerId === p.reponedorId && draggingIndex?.index === idx
-                                const isOver = dragOverIndex?.workerId === p.reponedorId && dragOverIndex?.index === idx
+                                const isDragging = draggingIndex?.workerId === p.reponedorId && draggingIndex?.idx === idx
+                                const isOver = dragOverIndex?.workerId === p.reponedorId && dragOverIndex?.idx === idx
 
                                 return (
-                                  <div 
-                                    key={pdvId} 
+                                  <div
+                                    key={pdvId}
                                     className="flex items-center gap-2 shrink-0"
-                                    draggable="true"
-                                    onDragStart={(e) => handleDragStart(e, p.reponedorId, idx)}
+                                    draggable
+                                    onDragStart={() => handleDragStart(p.reponedorId, idx)}
                                     onDragOver={(e) => handleDragOver(e, p.reponedorId, idx)}
-                                    onDrop={(e) => handleDrop(e, p.reponedorId, idx)}
+                                    onDrop={() => handleDrop(p.reponedorId, idx)}
                                     onDragEnd={() => {
                                       setDraggingIndex(null)
                                       setDragOverIndex(null)
@@ -1632,6 +1607,11 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                         ? "border-primary border-dashed bg-primary/5 scale-105 shadow-md"
                                         : "bg-gradient-to-b from-card to-muted/20 border-border/80 hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-sm"
                                     ].join(" ")}>
+                                      {/* Drag Handle */}
+                                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
+                                        <GripVertical className="h-4 w-4" />
+                                      </div>
+
                                       {/* Delete Button */}
                                       <button
                                         onClick={() => handleRemoveTomorrow(pdvId, p.reponedorId)}
@@ -1654,7 +1634,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                 )
                               })}
                               {p.sequence.length === 0 && (
-                                <p className="text-xs text-muted-foreground italic">Sin secuencia generada.</p>
+                                <p className="text-xs text-muted-foreground italic w-full text-center mt-3">Sin secuencia generada. Añade puntos para trazar ruta.</p>
                               )}
                             </div>
                           </div>

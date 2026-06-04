@@ -992,7 +992,13 @@ export async function removePdvFromRoute(pdvId: string, reponedorUuid: string, d
 
 export async function getRoutesPlanForDate(dateStr: string) {
   try {
+<<<<<<< HEAD
     // 1. Check if plans already exist for this date
+=======
+    const targetDate = new Date(`${dateStr}T12:00:00Z`)
+
+    // 1. Check if plans already exist for dateStr
+>>>>>>> feature/luis
     const { data: existingPlans, error: fetchErr } = await supabaseAdmin
       .from('daily_routes_plan')
       .select('*')
@@ -1030,6 +1036,7 @@ export async function getRoutesPlanForDate(dateStr: string) {
 
     if (pdvsErr) throw new Error(pdvsErr.message)
 
+<<<<<<< HEAD
     // Determine day of week for the target date
     const parts = dateStr.split('-')
     const year = parseInt(parts[0])
@@ -1041,6 +1048,13 @@ export async function getRoutesPlanForDate(dateStr: string) {
     const targetDay = days[targetDate.getDay()]
 
     // Filter PDVs available on targetDay
+=======
+    // Determine day of week for dateStr
+    const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
+    const targetDayStr = days[targetDate.getDay()] // e.g. "LUN"
+
+    // Filter PDVs available dateStr
+>>>>>>> feature/luis
     const getAvailableDays = (category: string, pdvId: string): string[] => {
       const numericSuffix = parseInt(pdvId.replace(/\D/g, '') || '0', 10)
       switch (category) {
@@ -1062,7 +1076,11 @@ export async function getRoutesPlanForDate(dateStr: string) {
       }
     }
 
+<<<<<<< HEAD
     const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(targetDay))
+=======
+    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(targetDayStr))
+>>>>>>> feature/luis
     const pdvPool = availablePdvs.length > 0 ? availablePdvs : pdvs
 
     // Greedy nearest-neighbor TSP sequence generator

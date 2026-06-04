@@ -413,8 +413,8 @@ export default function ControlTowerDashboard() {
                 </button>
               </div>
             )}
-            <main className="flex-1 overflow-y-auto">
-              <div className="p-4 md:p-5 max-w-7xl mx-auto space-y-4">
+            <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className={`p-4 md:p-5 mx-auto w-full flex-1 flex flex-col min-h-0 ${activeModule !== 'map' ? 'max-w-7xl overflow-y-auto space-y-4' : 'max-w-none'}`}>
                 {/* Main Dashboard Module */}
                 {activeModule === 'dashboard' && (
                   <MainDashboard
@@ -573,11 +573,7 @@ export default function ControlTowerDashboard() {
 
                 {/* Live Map Module */}
                 {activeModule === 'map' && (
-                  <div className="space-y-3 animate-in fade-in">
-                    <div>
-                      <h1 className="text-xl font-extrabold text-foreground tracking-tight">Operaciones de Campo en Vivo</h1>
-                    </div>
-
+                  <div className="animate-in fade-in flex-1 min-h-0 flex flex-col">
                     <LiveMap
                       pdvs={mockData.pdvs}
                       reponedores={mockData.reponedores}
