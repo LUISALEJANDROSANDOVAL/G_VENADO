@@ -37,6 +37,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const [showMayorista, setShowMayorista] = useState(true)
   const [showDetallista, setShowDetallista] = useState(true)
   const [showWorkers, setShowWorkers] = useState(true)
+  const [showRoute, setShowRoute] = useState(true)
   
   const [viewState, setViewState] = useState({
     longitude: -63.1812,
@@ -47,6 +48,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   })
 
   const [routeGeometry, setRouteGeometry] = useState<any>(null)
+  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
 
   const mainCities = ['Todas', 'Santa Cruz', 'La Paz', 'Cochabamba']
   const [selectedCity, setSelectedCity] = useState<string>('Todas')
@@ -54,8 +56,18 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   useEffect(() => {
     if (selectedWorkerId) {
       const worker = reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId)
-      if (worker && worker.city) {
-        setSelectedCity(worker.city)
+      if (worker) {
+        if (worker.city) {
+          setSelectedCity(worker.city)
+        }
+        if (worker.lat && worker.lng) {
+          setViewState(prev => ({
+            ...prev,
+            longitude: worker.lng,
+            latitude: worker.lat,
+            zoom: 14
+          }))
+        }
       }
     }
   }, [selectedWorkerId, reponedores])
@@ -128,12 +140,12 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       return true
     })
 
-    // Limit markers when no worker selected to prevent lag
-    if (!selectedWorker && filtered.length > 80) {
+    // Limit markers ONLY when 'Todas' is selected and there are too many, to prevent massive lag
+    if (!selectedWorker && selectedCity === 'Todas' && filtered.length > 150) {
       const pareto = filtered.filter(p => p.type === 'Pareto')
       const mayorista = filtered.filter(p => p.type === 'Mayorista')
       const detallista = filtered.filter(p => p.type === 'Detallista')
-      filtered = [...pareto, ...mayorista.slice(0, 40), ...detallista.slice(0, 30)]
+      filtered = [...pareto, ...mayorista.slice(0, 80), ...detallista.slice(0, 70)]
     }
 
     return filtered
@@ -143,6 +155,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   useEffect(() => {
     if (!selectedWorker || !MAPBOX_TOKEN || MAPBOX_TOKEN === 'PEGA_TU_TOKEN_AQUI') {
       setRouteGeometry(null)
+      setRouteInfo(null)
       return
     }
 
@@ -160,11 +173,16 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
         .then(data => {
           if (data.routes && data.routes[0]) {
             setRouteGeometry(data.routes[0].geometry)
+            setRouteInfo({
+              distance: data.routes[0].distance,
+              duration: data.routes[0].duration
+            })
           }
         })
         .catch(err => console.error("Error fetching route:", err))
     } else {
        setRouteGeometry(null)
+       setRouteInfo(null)
     }
   }, [selectedWorker, pdvs])
 
@@ -196,6 +214,12 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
     : []
 
   const isTokenValid = MAPBOX_TOKEN && MAPBOX_TOKEN !== 'PEGA_TU_TOKEN_AQUI'
+
+  const totalDistance = routeInfo ? routeInfo.distance / 1000 : (selectedWorker?.sequence?.length || 0) * 1.2
+  const totalTime = routeInfo ? routeInfo.duration / 60 : (selectedWorker?.sequence?.length || 0) * 15
+  const progressPct = selectedWorker?.routeProgress || 0
+  const traveledDistance = totalDistance * (progressPct / 100)
+  const traveledTime = totalTime * (progressPct / 100)
 
   return (
     <div className="flex h-full w-full bg-background gap-4 rounded-xl overflow-hidden font-sans">
@@ -319,12 +343,12 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
               <div className="flex gap-2">
                  <div className="flex-1 bg-background rounded-xl p-3 flex flex-col items-center justify-center">
                    <Navigation className="w-4 h-4 text-zinc-400 mb-1" />
-                   <span className="text-foreground font-bold text-sm">{(selectedWorker.routeProgress * 0.15).toFixed(1)} km</span>
+                   <span className="text-foreground font-bold text-sm">{traveledDistance.toFixed(1)} / {totalDistance.toFixed(1)} km</span>
                    <span className="text-[9px] text-zinc-500 uppercase font-semibold">Distancia</span>
                  </div>
                  <div className="flex-1 bg-background rounded-xl p-3 flex flex-col items-center justify-center">
                    <Clock className="w-4 h-4 text-zinc-400 mb-1" />
-                   <span className="text-foreground font-bold text-sm">{(selectedWorker.routeProgress * 2.4).toFixed(0)} min</span>
+                   <span className="text-foreground font-bold text-sm">{traveledTime.toFixed(0)} / {totalTime.toFixed(0)} min</span>
                    <span className="text-[9px] text-zinc-500 uppercase font-semibold">Tiempo</span>
                  </div>
               </div>
@@ -397,7 +421,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
               <NavigationControl position="top-right" />
               
               {/* Real route line */}
-              {selectedWorker && routeGeometry && (
+              {selectedWorker && showRoute && routeGeometry && (
                 <Source id="real-route" type="geojson" data={{ type: 'Feature', geometry: routeGeometry, properties: {} }}>
                   <Layer id="route-line" type="line" paint={{ 'line-color': '#7b61ff', 'line-width': 4, 'line-opacity': 0.8 }} />
                 </Source>
@@ -487,7 +511,11 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
              <FilterBtn active={showPareto} onClick={() => setShowPareto(!showPareto)} color="#ff3366" label="PDVs Pareto" />
              <FilterBtn active={showMayorista} onClick={() => setShowMayorista(!showMayorista)} color="#33ccff" label="PDVs Mayoristas" />
              <FilterBtn active={showDetallista} onClick={() => setShowDetallista(!showDetallista)} color="#a1a1aa" label="PDVs Detallistas" />
-             <FilterBtn active={showWorkers} onClick={() => setShowWorkers(!showWorkers)} color="#7b61ff" label="Reponedores Activos" />
+             {selectedWorker ? (
+               <FilterBtn active={showRoute} onClick={() => setShowRoute(!showRoute)} color="#7b61ff" label="Mostrar Ruta" />
+             ) : (
+               <FilterBtn active={showWorkers} onClick={() => setShowWorkers(!showWorkers)} color="#7b61ff" label="Reponedores Activos" />
+             )}
           </div>
         </div>
 

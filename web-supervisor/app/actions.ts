@@ -322,17 +322,29 @@ export async function getDashboardData() {
     }
 
     // Map PDVs
-    const mappedPdvs = pdvs.map(p => ({
-      id: p.id,
-      nombre: p.name,
-      type: p.category === 'PARETO' ? 'Pareto' : p.category === 'MAYORISTA' ? 'Mayorista' : 'Detallista',
-      lat: parseFloat(p.latitude as any),
-      lng: parseFloat(p.longitude as any),
-      visited: visitedPdvIds.has(p.id),
-      lastVisit: lastVisitMap[p.id] || undefined,
-      availableDays: getAvailableDays(p.category, p.id),
-      city: p.market
-    }))
+    const mappedPdvs = pdvs.map(p => {
+      const lat = parseFloat(p.latitude as any)
+      const lng = parseFloat(p.longitude as any)
+      let city = p.market
+      
+      if (!isNaN(lng)) {
+        if (lng < -67) city = 'La Paz'
+        else if (lng > -64) city = 'Santa Cruz'
+        else city = 'Cochabamba'
+      }
+
+      return {
+        id: p.id,
+        nombre: p.name,
+        type: p.category === 'PARETO' ? 'Pareto' : p.category === 'MAYORISTA' ? 'Mayorista' : 'Detallista',
+        lat,
+        lng,
+        visited: visitedPdvIds.has(p.id),
+        lastVisit: lastVisitMap[p.id] || undefined,
+        availableDays: getAvailableDays(p.category, p.id),
+        city
+      }
+    })
 
     // Map Reponedores
     const mappedReponedores = users.map((user, idx) => {
