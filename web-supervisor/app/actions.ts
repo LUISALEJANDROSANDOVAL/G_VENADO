@@ -990,17 +990,13 @@ export async function removePdvFromRoute(pdvId: string, reponedorUuid: string, d
   }
 }
 
-export async function getTomorrowRoutesPlan() {
+export async function getRoutesPlanForDate(dateStr: string) {
   try {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
-
-    // 1. Check if plans already exist for tomorrow
+    // 1. Check if plans already exist for this date
     const { data: existingPlans, error: fetchErr } = await supabaseAdmin
       .from('daily_routes_plan')
       .select('*')
-      .eq('date', tomorrowStr)
+      .eq('date', dateStr)
 
     if (fetchErr) throw new Error(fetchErr.message)
 
@@ -1034,11 +1030,17 @@ export async function getTomorrowRoutesPlan() {
 
     if (pdvsErr) throw new Error(pdvsErr.message)
 
-    // Determine day of week for tomorrow
-    const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
-    const tomorrowDay = days[tomorrow.getDay()] // e.g. "LUN"
+    // Determine day of week for the target date
+    const parts = dateStr.split('-')
+    const year = parseInt(parts[0])
+    const month = parseInt(parts[1]) - 1
+    const day = parseInt(parts[2])
+    const targetDate = new Date(year, month, day)
 
-    // Filter PDVs available tomorrow
+    const days = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB']
+    const targetDay = days[targetDate.getDay()]
+
+    // Filter PDVs available on targetDay
     const getAvailableDays = (category: string, pdvId: string): string[] => {
       const numericSuffix = parseInt(pdvId.replace(/\D/g, '') || '0', 10)
       switch (category) {
@@ -1060,7 +1062,7 @@ export async function getTomorrowRoutesPlan() {
       }
     }
 
-    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(tomorrowDay))
+    const availablePdvs = pdvs.filter(p => getAvailableDays(p.category, p.id).includes(targetDay))
     const pdvPool = availablePdvs.length > 0 ? availablePdvs : pdvs
 
     // Greedy nearest-neighbor TSP sequence generator
@@ -1183,20 +1185,16 @@ export async function getTomorrowRoutesPlan() {
 
     return { published: false, plans: suggestedPlans }
   } catch (e: any) {
-    console.error('Failed to get tomorrow routes plan:', e)
+    console.error('Failed to get routes plan for date:', e)
     return { error: e.message || 'Error al obtener planificación.' }
   }
 }
 
-export async function publishTomorrowRoutesPlan(plans: any[]) {
+export async function publishRoutesPlanForDate(plans: any[], dateStr: string) {
   try {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
-
     const rowsToInsert = plans.map(p => ({
       reponedor_id: p.reponedorId,
-      date: tomorrowStr,
+      date: dateStr,
       optimized_pos_sequence: p.sequence,
       status: 'ASIGNADA'
     }))
@@ -1209,8 +1207,22 @@ export async function publishTomorrowRoutesPlan(plans: any[]) {
 
     return { success: true }
   } catch (e: any) {
-    console.error('Failed to publish tomorrow routes plan:', e)
+    console.error('Failed to publish routes plan for date:', e)
     return { error: e.message || 'Error al publicar planificación.' }
   }
+}
+
+export async function getTomorrowRoutesPlan() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  return getRoutesPlanForDate(tomorrowStr)
+}
+
+export async function publishTomorrowRoutesPlan(plans: any[]) {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  return publishRoutesPlanForDate(plans, tomorrowStr)
 }
 

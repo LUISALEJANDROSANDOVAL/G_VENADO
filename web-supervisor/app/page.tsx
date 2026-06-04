@@ -272,7 +272,7 @@ export default function ControlTowerDashboard() {
 
     loadData()
 
-    // Subscribe to task_logs and daily_routes_plan updates in real-time
+    // Subscribe to task_logs, daily_routes_plan and reponedor_locations updates in real-time
     const channel = supabase
       .channel('db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_logs' }, () => {
@@ -282,6 +282,54 @@ export default function ControlTowerDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_routes_plan' }, () => {
         console.log('Realtime change in daily_routes_plan, refreshing dashboard...')
         loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reponedor_locations' }, (payload) => {
+        console.log('Realtime change in reponedor_locations:', payload)
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newLoc = payload.new as any
+          setMockData(prev => {
+            if (!prev) return prev
+            const updatedReponedores = prev.reponedores.map(rep => {
+              if (rep.dbUuid === newLoc.reponedor_id) {
+                return {
+                  ...rep,
+                  lat: Number(newLoc.latitude),
+                  lng: Number(newLoc.longitude)
+                }
+              }
+              return rep
+            })
+            return {
+              ...prev,
+              reponedores: updatedReponedores
+            }
+          })
+        } else if (payload.eventType === 'DELETE') {
+          const oldLoc = payload.old as any
+          setMockData(prev => {
+            if (!prev) return prev
+            const updatedReponedores = prev.reponedores.map(rep => {
+              if (rep.dbUuid === oldLoc.reponedor_id) {
+                const cityCoords = {
+                  'Cochabamba': { lat: -17.3895, lng: -66.1568 },
+                  'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
+                  'La Paz': { lat: -16.5000, lng: -68.1500 }
+                }
+                const coords = cityCoords[rep.city as keyof typeof cityCoords] || cityCoords['Santa Cruz']
+                return {
+                  ...rep,
+                  lat: coords.lat,
+                  lng: coords.lng
+                }
+              }
+              return rep
+            })
+            return {
+              ...prev,
+              reponedores: updatedReponedores
+            }
+          })
+        }
       })
       .subscribe()
 

@@ -133,6 +133,7 @@ function RouteHistoryMapModal({
 
   const routeGeoJSON = coords.length > 1 ? {
     type: 'Feature' as const,
+    properties: {},
     geometry: { type: 'LineString' as const, coordinates: coords }
   } : null
 

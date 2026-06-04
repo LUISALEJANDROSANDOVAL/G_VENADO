@@ -163,6 +163,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
 
      return {
         type: 'Feature' as const,
+        properties: {},
         geometry: {
            type: 'LineString' as const,
            coordinates: coords
