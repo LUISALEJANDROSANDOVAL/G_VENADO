@@ -896,7 +896,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   }).filter(entry => entry.status === 'Completada')
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto">
+    <div className="space-y-6 w-full mx-auto">
       {/* ── Tab switcher ── */}
       <div className="flex gap-6 border-b border-border w-full">
         {[

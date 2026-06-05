@@ -17,6 +17,7 @@ interface LiveMapProps {
 }
 
 const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
+  'Todas': { lat: -16.2902, lng: -63.5887, zoom: 5 },
   'Cochabamba': { lat: -17.3895, lng: -66.1568, zoom: 12 },
   'Santa Cruz': { lat: -17.7862, lng: -63.1812, zoom: 12 },
   'La Paz': { lat: -16.5000, lng: -68.1500, zoom: 12 },
@@ -106,7 +107,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       }
     }
     
-    if (city !== 'Todas' && CITY_COORDINATES[city]) {
+    if (CITY_COORDINATES[city]) {
       setViewState(prev => ({
         ...prev,
         longitude: CITY_COORDINATES[city].lng,

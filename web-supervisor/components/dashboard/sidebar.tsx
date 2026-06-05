@@ -81,18 +81,24 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
                   key={module.id}
                   onClick={() => onModuleChange(module.id)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer text-left',
+                    'group w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 cursor-pointer text-left',
                     isActive
-                      ? 'bg-white/12 text-white shadow-sm font-bold'
-                      : 'text-white/80 hover:text-white hover:bg-white/5'
+                      ? 'bg-white/15 text-white shadow-md font-bold ring-1 ring-white/10'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   )}
                 >
-                  <Icon className={cn('h-4.5 w-4.5 transition-transform duration-200', isActive ? 'scale-105' : '')} />
-                  <span>{module.label}</span>
+                  <Icon className={cn(
+                    'h-5 w-5 transition-all duration-300 ease-out', 
+                    isActive ? 'scale-110 drop-shadow-md text-white' : 'group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:text-blue-100 group-hover:drop-shadow-lg'
+                  )} />
+                  <span className="flex-1">{module.label}</span>
 
                   {/* Premium Notification Badge next to Map Module */}
                   {module.id === 'map' && activeReponedoresCount !== undefined && activeReponedoresCount > 0 && (
-                    <span className="ml-auto bg-white text-[#00457C] text-[10px] font-extrabold px-1.5 py-0.5 rounded-md min-w-[20px] text-center shadow-sm">
+                    <span className={cn(
+                      "ml-auto bg-white text-[#00457C] text-[10px] font-extrabold px-2 py-0.5 rounded-md min-w-[20px] text-center shadow-sm transition-transform duration-300",
+                      isActive ? "scale-105" : "group-hover:scale-110"
+                    )}>
                       {activeReponedoresCount}
                     </span>
                   )}

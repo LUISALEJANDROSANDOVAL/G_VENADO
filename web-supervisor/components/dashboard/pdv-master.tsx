@@ -23,15 +23,18 @@ import {
   TableRow,
 
 } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { PDV, ClientType, WeekDay } from '@/lib/mock-data'
-import { uploadPdvs } from '@/app/actions'
+import { uploadPdvs, createPdv, updatePdv, deletePdv } from '@/app/actions'
+import { useToast } from '@/hooks/use-toast'
 
 interface PDVMasterProps {
   pdvs: PDV[]
   onRefresh?: () => void
 }
 
-export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
+export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<ClientType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'visited' | 'unvisited'>('all')
@@ -53,10 +56,95 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
+  // PDV Form States
+  const [isPdvModalOpen, setIsPdvModalOpen] = useState(false)
+  const [editPdvData, setEditPdvData] = useState<any>(null)
+  const [pdvFormData, setPdvFormData] = useState({
+    name: '', market: 'Santa Cruz', category: 'DETALLISTA', latitude: '', longitude: '', base_duration_minutes: '30'
+  })
+  const [isSavingPdv, setIsSavingPdv] = useState(false)
+  const { toast } = useToast()
+
   // Reset page on search or filter change
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, filterType, filterStatus])
+
+  // Auto-calculate market based on longitude
+  useEffect(() => {
+    const lng = parseFloat(pdvFormData.longitude)
+    if (!isNaN(lng)) {
+      let newCity = 'Cochabamba'
+      if (lng < -67) newCity = 'La Paz'
+      else if (lng > -64) newCity = 'Santa Cruz'
+      
+      if (pdvFormData.market !== newCity) {
+        setPdvFormData(prev => ({ ...prev, market: newCity }))
+      }
+    }
+  }, [pdvFormData.longitude, pdvFormData.market])
+
+  const handleOpenPdvModal = (pdv?: any) => {
+    if (pdv) {
+      setEditPdvData(pdv)
+      setPdvFormData({
+        name: pdv.nombre,
+        market: pdv.city || 'Santa Cruz',
+        category: pdv.type.toUpperCase(),
+        latitude: String(pdv.lat),
+        longitude: String(pdv.lng),
+        base_duration_minutes: pdv.base_duration_minutes ? String(pdv.base_duration_minutes) : '30'
+      })
+    } else {
+      setEditPdvData(null)
+      setPdvFormData({ name: '', market: 'Santa Cruz', category: 'DETALLISTA', latitude: '', longitude: '', base_duration_minutes: '30' })
+    }
+    setIsPdvModalOpen(true)
+  }
+
+  const handleSavePdv = async () => {
+    setIsSavingPdv(true)
+    const payload = {
+      name: pdvFormData.name,
+      market: pdvFormData.market,
+      category: pdvFormData.category,
+      latitude: parseFloat(pdvFormData.latitude),
+      longitude: parseFloat(pdvFormData.longitude),
+      base_duration_minutes: parseInt(pdvFormData.base_duration_minutes)
+    }
+
+    let res;
+    if (editPdvData) {
+      res = await updatePdv(editPdvData.id, payload)
+    } else {
+      const newId = `PDV-${Math.floor(1000 + Math.random() * 9000)}`
+      res = await createPdv({ ...payload, id: newId })
+    }
+    setIsSavingPdv(false)
+
+    if (res.error) {
+      toast({ title: 'Error', description: res.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Éxito', description: editPdvData ? 'PDV actualizado.' : 'PDV creado.' })
+      setIsPdvModalOpen(false)
+      if (onRefresh) onRefresh()
+    }
+  }
+
+  const handleDeletePdv = async (id: string, name: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el punto de venta "${name}"?`)) return;
+    
+    setIsSavingPdv(true)
+    const res = await deletePdv(id)
+    setIsSavingPdv(false)
+
+    if (res.error) {
+      toast({ title: 'Error', description: res.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Éxito', description: 'PDV eliminado.' })
+      if (onRefresh) onRefresh()
+    }
+  }
 
   const handleCopyCoords = (lat: number, lng: number, pdvId: string) => {
     navigator.clipboard.writeText(`${lat}, ${lng}`)
@@ -279,29 +367,77 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
 
   return (
     <div className="space-y-6 w-full mx-auto animate-in fade-in">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Title and Actions Row */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Datos Maestros de PDV</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestionar y buscar ubicaciones de puntos de venta</p>
+          <h2 className="text-xl font-bold">Listado de Puntos de Venta</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Mostrando {startRow}-{endRow} de {filteredPDVs.length} PDVs filtrados
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
           <Button
+            size="sm"
+            onClick={() => handleOpenPdvModal()}
+            className="gap-2 bg-primary hover:bg-primary/90 text-white font-medium shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo PDV
+          </Button>
+          <Button
+            size="sm"
             onClick={() => setShowUploadZone(!showUploadZone)}
             variant="outline"
-            className={`gap-2 cursor-pointer transition-colors ${showUploadZone ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20 font-semibold' : 'border-border text-muted-foreground font-semibold'}`}
+            className={`gap-2 cursor-pointer transition-colors font-medium shadow-sm ${showUploadZone ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' : 'bg-background/50 border-border text-foreground/80'}`}
           >
             <Upload className="h-4 w-4" />
             Importar CSV
           </Button>
           <Button 
+            size="sm"
             onClick={handleExportBI} 
             variant="outline" 
-            className="gap-2 border-primary text-primary hover:bg-primary/5 cursor-pointer font-semibold"
+            className="gap-2 border-primary text-primary bg-background/50 hover:bg-primary/5 cursor-pointer font-medium shadow-sm"
           >
             <Download className="h-4 w-4" />
-            Exportar para BI (Excel)
+            Exportar para BI
           </Button>
         </div>
+      </div>
+
+      {/* Search and Filters Row */}
+      <div className="flex flex-col sm:flex-row items-center gap-3 w-full mb-4">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre comercial o ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 w-full bg-background/50 border-border shadow-sm text-sm"
+          />
+        </div>
+        <Select value={filterType} onValueChange={(v) => setFilterType(v as ClientType | 'all')}>
+          <SelectTrigger className="w-full sm:w-[160px] bg-background/50 text-sm shadow-sm">
+            <SelectValue placeholder="Filtrar por tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="Pareto">Pareto</SelectItem>
+            <SelectItem value="Mayorista">Mayorista</SelectItem>
+            <SelectItem value="Detallista">Detallista</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'visited' | 'unvisited')}>
+          <SelectTrigger className="w-full sm:w-[160px] bg-background/50 text-sm shadow-sm">
+            <SelectValue placeholder="Filtrar por estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="visited">Visitado</SelectItem>
+            <SelectItem value="unvisited">No visitado</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {showUploadZone && (
@@ -332,49 +468,8 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
         </Card>
       )}
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre comercial o ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 text-foreground"
-          />
-        </div>
-        <Select value={filterType} onValueChange={(v) => setFilterType(v as ClientType | 'all')}>
-          <SelectTrigger className="w-full md:w-40 text-foreground">
-            <SelectValue placeholder="Filtrar por tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            <SelectItem value="Pareto">Pareto</SelectItem>
-            <SelectItem value="Mayorista">Mayorista</SelectItem>
-            <SelectItem value="Detallista">Detallista</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'visited' | 'unvisited')}>
-          <SelectTrigger className="w-full md:w-40 text-foreground">
-            <SelectValue placeholder="Filtrar por estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="visited">Visitado</SelectItem>
-            <SelectItem value="unvisited">No visitado</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       <Card className="border-border w-full shadow-sm">
-        <CardHeader className="pb-4">
-          <div>
-            <CardTitle className="text-base font-semibold">Listado de Puntos de Venta</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Mostrando {startRow}-{endRow} de {filteredPDVs.length} PDVs filtrados
-            </p>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="rounded-lg border border-border overflow-x-auto w-full">
             <Table className="w-full">
               <TableHeader className="bg-muted/50">
@@ -383,7 +478,6 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
                   <TableHead className="text-foreground/70 font-semibold w-[12%]">Clasificación</TableHead>
                   <TableHead className="text-foreground/70 font-semibold w-[22%]">Coordenadas</TableHead>
                   <TableHead className="text-foreground/70 font-semibold w-[18%]">Disponibilidad</TableHead>
-                  <TableHead className="text-foreground/70 font-semibold w-[10%]">Visita</TableHead>
                   <TableHead className="text-foreground/70 font-semibold w-[8%] text-center">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -393,8 +487,7 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
                     <TableCell className="py-3.5">
                       <div className="flex flex-col">
                         <span 
-                          onClick={() => setSelectedPdvHistory(pdv)}
-                          className="font-semibold text-foreground text-sm hover:text-primary transition-colors cursor-pointer hover:underline"
+                          className="font-semibold text-foreground text-sm"
                         >
                           {pdv.nombre}
                         </span>
@@ -437,45 +530,33 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        {ALL_DAYS.map((day) => {
-                          const isActive = (pdv.availableDays ?? []).includes(day)
-                          const isToday = day === todayAbbr
-                          return (
-                            <span
-                              key={day}
-                              title={isActive ? `Atiende los ${day}` : `No disponible los ${day}`}
-                              className={[
-                                'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[9px] font-bold border transition-all select-none',
-                                isActive
-                                  ? DAY_COLORS[day]
-                                  : 'bg-muted/30 text-muted-foreground/30 border-border/30',
-                                isToday && isActive
-                                  ? 'ring-2 ring-offset-1 ring-offset-card ring-current shadow-sm'
-                                  : '',
-                              ].join(' ')}
-                            >
-                              {day}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <Badge
-                          variant={pdv.visited ? 'secondary' : 'outline'}
-                          className={`text-[9px] w-fit font-bold ${
-                            pdv.visited
-                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                              : 'bg-muted/30 text-muted-foreground border-border'
-                          }`}
-                        >
-                          {pdv.visited ? '✓ Visitado' : 'Pendiente'}
-                        </Badge>
-                        <span className="text-[9px] text-muted-foreground/60">
-                          {pdv.lastVisit ? new Date(pdv.lastVisit).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : 'Nunca'}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          Frecuencia: {pdv.availableDays ? pdv.availableDays.length : 0} veces / sem.
                         </span>
+                        <div className="flex gap-1 flex-wrap">
+                          {ALL_DAYS.map((day) => {
+                            const isActive = (pdv.availableDays ?? []).includes(day)
+                            const isToday = day === todayAbbr
+                            return (
+                              <span
+                                key={day}
+                                title={isActive ? `Atiende los ${day}` : `No disponible los ${day}`}
+                                className={[
+                                  'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[9px] font-bold border transition-all select-none',
+                                  isActive
+                                    ? DAY_COLORS[day]
+                                    : 'bg-muted/30 text-muted-foreground/30 border-border/30',
+                                  isToday && isActive
+                                    ? 'ring-2 ring-offset-1 ring-offset-card ring-current shadow-sm'
+                                    : '',
+                                ].join(' ')}
+                              >
+                                {day}
+                              </span>
+                            )
+                          })}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -483,11 +564,20 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => setSelectedPdvHistory(pdv)}
+                          onClick={() => handleOpenPdvModal(pdv)}
                           className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                          title="Ver Detalle / Historial"
+                          title="Editar PDV"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeletePdv(pdv.id, pdv.nombre)}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          title="Eliminar PDV"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
@@ -735,6 +825,66 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
           <button onClick={() => setReportSuccessMsg('')} className="ml-2 font-bold hover:opacity-80 text-white cursor-pointer">×</button>
         </div>
       )}
+
+      {/* Nuevo/Editar PDV Modal */}
+      <Dialog open={isPdvModalOpen} onOpenChange={setIsPdvModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editPdvData ? 'Editar Punto de Venta' : 'Añadir Nuevo Punto de Venta'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Nombre Comercial</label>
+              <Input value={pdvFormData.name} onChange={e => setPdvFormData({ ...pdvFormData, name: e.target.value })} className="col-span-3 text-sm" placeholder="Ej. Supermercado Ketal" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Ciudad/Mercado</label>
+              <Select disabled value={pdvFormData.market} onValueChange={v => setPdvFormData({ ...pdvFormData, market: v })}>
+                <SelectTrigger className="col-span-3 text-sm">
+                  <SelectValue placeholder="Selecciona una ciudad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Santa Cruz">Santa Cruz</SelectItem>
+                  <SelectItem value="Cochabamba">Cochabamba</SelectItem>
+                  <SelectItem value="La Paz">La Paz</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Clasificación</label>
+              <Select value={pdvFormData.category} onValueChange={v => setPdvFormData({ ...pdvFormData, category: v })}>
+                <SelectTrigger className="col-span-3 text-sm">
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PARETO">Pareto</SelectItem>
+                  <SelectItem value="MAYORISTA">Mayorista</SelectItem>
+                  <SelectItem value="DETALLISTA">Detallista</SelectItem>
+                  <SelectItem value="MINORISTA">Minorista</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Latitud</label>
+              <Input type="number" step="0.000001" value={pdvFormData.latitude} onChange={e => setPdvFormData({ ...pdvFormData, latitude: e.target.value })} className="col-span-3 text-sm font-mono" placeholder="-17.7862" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Longitud</label>
+              <Input type="number" step="0.000001" value={pdvFormData.longitude} onChange={e => setPdvFormData({ ...pdvFormData, longitude: e.target.value })} className="col-span-3 text-sm font-mono" placeholder="-63.1812" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right text-xs font-semibold">Duración Base (min)</label>
+              <Input type="number" value={pdvFormData.base_duration_minutes} onChange={e => setPdvFormData({ ...pdvFormData, base_duration_minutes: e.target.value })} className="col-span-3 text-sm" placeholder="30" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPdvModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSavePdv} disabled={isSavingPdv || !pdvFormData.name || !pdvFormData.latitude || !pdvFormData.longitude}>
+              {isSavingPdv ? 'Guardando...' : 'Guardar PDV'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

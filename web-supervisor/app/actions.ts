@@ -1234,3 +1234,76 @@ export async function publishTomorrowRoutesPlan(plans: any[]) {
   return publishRoutesPlanForDate(plans, tomorrowStr)
 }
 
+// ─── CRUD Actions for PDVs ───────────────────────────────────────────────────
+
+export async function createPdv(data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('points_of_sale').insert(data);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error creating PDV:', e);
+    return { error: e.message || 'Error al crear PDV.' };
+  }
+}
+
+export async function updatePdv(id: string, data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('points_of_sale').update(data).eq('id', id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error updating PDV:', e);
+    return { error: e.message || 'Error al actualizar PDV.' };
+  }
+}
+
+export async function deletePdv(id: string) {
+  try {
+    const { error } = await supabaseAdmin.from('points_of_sale').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error deleting PDV:', e);
+    return { error: e.message || 'Error al eliminar PDV.' };
+  }
+}
+
+// ─── CRUD Actions for Reponedores ────────────────────────────────────────────
+
+export async function createWorker(data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('users').insert({
+      ...data,
+      role: 'REPONEDOR',
+      is_active: true
+    });
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error creating worker:', e);
+    return { error: e.message || 'Error al crear reponedor.' };
+  }
+}
+
+export async function updateWorker(id: string, data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('users').update(data).eq('id', id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error updating worker:', e);
+    return { error: e.message || 'Error al actualizar reponedor.' };
+  }
+}
+
+export async function deactivateWorker(id: string) {
+  try {
+    const { error } = await supabaseAdmin.from('users').update({ is_active: false }).eq('id', id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error deactivating worker:', e);
+    return { error: e.message || 'Error al desactivar reponedor.' };
+  }
+}

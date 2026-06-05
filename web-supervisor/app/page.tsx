@@ -6,12 +6,38 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { KPICards } from '@/components/dashboard/kpi-cards'
 import { AnalyticsCharts } from '@/components/dashboard/analytics-charts'
 import { RouteManagement } from '@/components/dashboard/route-management'
-import { PDVMaster } from '@/components/dashboard/pdv-master'
+import { AdminMaster } from '@/components/dashboard/admin-master'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import dynamic from 'next/dynamic'
 import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table, Globe } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Login } from '@/components/auth/login'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+const CITY_FILTERS: Record<string, { zonas: { nombre: string, supervisores: string[] }[] }> = {
+  'Santa Cruz': {
+    zonas: [
+      { nombre: 'Zona Norte', supervisores: ['Carlos Méndez'] },
+      { nombre: 'Zona Central', supervisores: ['Ana García'] },
+      { nombre: 'Zona Sur', supervisores: ['José Torres'] }
+    ]
+  },
+  'La Paz': {
+    zonas: [
+      { nombre: 'Centro', supervisores: ['Laura Martínez'] },
+      { nombre: 'El Alto', supervisores: ['Pedro Sánchez'] },
+      { nombre: 'Zona Sur', supervisores: ['Luis Rojas'] }
+    ]
+  },
+  'Cochabamba': {
+    zonas: [
+      { nombre: 'Cercado', supervisores: ['María López'] },
+      { nombre: 'Quillacollo', supervisores: ['Juan Pérez'] },
+      { nombre: 'Sacaba', supervisores: ['Roberto Guzmán'] }
+    ]
+  }
+}
+
 
 const LiveMap = dynamic(
   () => import('@/components/dashboard/live-map').then((mod) => mod.LiveMap),
@@ -504,7 +530,7 @@ export default function ControlTowerDashboard() {
               </div>
             )}
             <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-              <div className={`p-4 md:p-5 mx-auto w-full flex-1 flex flex-col min-h-0 ${activeModule === 'map' || activeModule === 'analytics' || activeModule === 'pdv' ? 'max-w-none overflow-y-auto space-y-4' : 'max-w-7xl overflow-y-auto space-y-4'}`}>
+              <div className="p-4 md:p-5 mx-auto w-full flex-1 flex flex-col min-h-0 max-w-none overflow-y-auto space-y-4">
                 {/* Main Dashboard Module */}
                 {activeModule === 'dashboard' && (
                   <MainDashboard
@@ -533,18 +559,19 @@ export default function ControlTowerDashboard() {
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-primary" /> Rango de Fechas:
                         </span>
-                        <select
-                          value={selectedDateRange}
-                          onChange={(e) => setSelectedDateRange(e.target.value)}
-                          className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
-                        >
-                          <option value="Hoy">Hoy</option>
-                          <option value="Ayer">Ayer</option>
-                          <option value="Últimos 7 días">Últimos 7 días</option>
-                          <option value="Últimos 30 días">Últimos 30 días</option>
-                          <option value="Mayo 2026">Mayo 2026</option>
-                          <option value="Personalizado">Rango Personalizado...</option>
-                        </select>
+                        <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
+                          <SelectTrigger className="w-[180px] bg-card border-border rounded-lg text-sm font-semibold h-8 shadow-sm">
+                            <SelectValue placeholder="Rango de Fechas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Hoy">Hoy</SelectItem>
+                            <SelectItem value="Ayer">Ayer</SelectItem>
+                            <SelectItem value="Últimos 7 días">Últimos 7 días</SelectItem>
+                            <SelectItem value="Últimos 30 días">Últimos 30 días</SelectItem>
+                            <SelectItem value="Mayo 2026">Mayo 2026</SelectItem>
+                            <SelectItem value="Personalizado">Rango Personalizado...</SelectItem>
+                          </SelectContent>
+                        </Select>
 
                         {selectedDateRange === 'Personalizado' && (
                           <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 duration-200">
@@ -574,16 +601,24 @@ export default function ControlTowerDashboard() {
                           <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                             <MapPin className="h-3.5 w-3.5 text-primary" /> Ciudad:
                           </span>
-                          <select
-                            value={selectedCity}
-                            onChange={(e) => setSelectedCity(e.target.value)}
-                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
+                          <Select 
+                            value={selectedCity} 
+                            onValueChange={(val) => {
+                              setSelectedCity(val)
+                              setSelectedZone('Todas')
+                              setSelectedSupervisor('Todos')
+                            }}
                           >
-                            <option value="Todas">Todas las ciudades</option>
-                            <option value="Santa Cruz">Santa Cruz</option>
-                            <option value="La Paz">La Paz</option>
-                            <option value="Cochabamba">Cochabamba</option>
-                          </select>
+                            <SelectTrigger className="w-[160px] bg-card border-border rounded-lg text-sm font-medium h-8 shadow-sm">
+                              <SelectValue placeholder="Ciudad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Todas">Todas las ciudades</SelectItem>
+                              <SelectItem value="Santa Cruz">Santa Cruz</SelectItem>
+                              <SelectItem value="La Paz">La Paz</SelectItem>
+                              <SelectItem value="Cochabamba">Cochabamba</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         {/* Zone Filter */}
@@ -591,16 +626,28 @@ export default function ControlTowerDashboard() {
                           <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                             <Globe className="h-3.5 w-3.5 text-primary" /> Zona:
                           </span>
-                          <select
-                            value={selectedZone}
-                            onChange={(e) => setSelectedZone(e.target.value)}
-                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
+                          <Select 
+                            value={selectedZone} 
+                            onValueChange={(val) => {
+                              setSelectedZone(val)
+                              setSelectedSupervisor('Todos')
+                            }}
                           >
-                            <option value="Todas">Todas las zonas</option>
-                            <option value="Zona Norte">Zona Norte (Carlos)</option>
-                            <option value="Zona Central">Zona Central (Ana)</option>
-                            <option value="Zona Sur">Zona Sur (José)</option>
-                          </select>
+                            <SelectTrigger className="w-[180px] bg-card border-border rounded-lg text-sm font-medium h-8 shadow-sm">
+                              <SelectValue placeholder="Zona" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Todas">Todas las zonas</SelectItem>
+                              {(() => {
+                                const zonas = selectedCity === 'Todas' 
+                                  ? Array.from(new Set(Object.values(CITY_FILTERS).flatMap(c => c.zonas.map(z => z.nombre))))
+                                  : CITY_FILTERS[selectedCity]?.zonas.map(z => z.nombre) || []
+                                return zonas.map(z => (
+                                  <SelectItem key={z} value={z}>{z}</SelectItem>
+                                ))
+                              })()}
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         {/* Supervisor Filter */}
@@ -608,16 +655,28 @@ export default function ControlTowerDashboard() {
                           <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                             <User className="h-3.5 w-3.5 text-primary" /> Supervisor:
                           </span>
-                          <select
-                            value={selectedSupervisor}
-                            onChange={(e) => setSelectedSupervisor(e.target.value)}
-                            className="bg-card border border-border rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground cursor-pointer font-medium"
-                          >
-                            <option value="Todos">Todos los supervisores</option>
-                            <option value="Carlos Méndez">Carlos Méndez (Norte)</option>
-                            <option value="Ana García">Ana García (Centro)</option>
-                            <option value="José Torres">José Torres (Sur)</option>
-                          </select>
+                          <Select value={selectedSupervisor} onValueChange={setSelectedSupervisor}>
+                            <SelectTrigger className="w-[200px] bg-card border-border rounded-lg text-sm font-medium h-8 shadow-sm">
+                              <SelectValue placeholder="Supervisor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Todos">Todos los supervisores</SelectItem>
+                              {(() => {
+                                let zonasObj = selectedCity === 'Todas' 
+                                  ? Object.values(CITY_FILTERS).flatMap(c => c.zonas)
+                                  : CITY_FILTERS[selectedCity]?.zonas || []
+                                
+                                if (selectedZone !== 'Todas') {
+                                  zonasObj = zonasObj.filter(z => z.nombre === selectedZone)
+                                }
+                                
+                                const supervisores = Array.from(new Set(zonasObj.flatMap(z => z.supervisores)))
+                                return supervisores.map(s => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))
+                              })()}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
@@ -694,10 +753,10 @@ export default function ControlTowerDashboard() {
                   </div>
                 )}
 
-                {/* PDV Master Module */}
+                {/* Admin Master Module */}
                 {activeModule === 'pdv' && (
                   <div className="space-y-3 animate-in fade-in">
-                    <PDVMaster pdvs={mockData.pdvs} onRefresh={loadData} />
+                    <AdminMaster pdvs={mockData.pdvs} reponedores={mockData.reponedores} onRefresh={loadData} />
                   </div>
                 )}
               </div>
