@@ -201,6 +201,17 @@
   --text-body-md: 14px;
   --text-display: 32px;
   --text-body-lg: 16px;
+
+  --animate-float: float 3s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-8px) scale(1.03);
+    }
+  }
 }
 
 @layer base {
