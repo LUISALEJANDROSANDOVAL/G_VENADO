@@ -39,6 +39,27 @@ dependencies:
   flutter_dotenv: ^5.2.1
   image_picker: ^1.2.2
   shared_preferences: ^2.5.5
+  connectivity_plus: ^6.1.4
+
+  # ── Enterprise: Almacenamiento local robusto ──
+  sqflite: ^2.3.0
+  path: ^1.9.0
+  path_provider: ^2.1.3
+
+  # ── Enterprise: Sincronización en segundo plano ──
+  workmanager: ^0.5.2
+
+  # ── Enterprise: GPS ininterrumpido (Foreground Service) ──
+  flutter_background_service: ^5.0.0
+  flutter_local_notifications: ^18.0.0
+
+  # ── Enterprise: Compresión de evidencias ──
+  flutter_image_compress: ^2.3.0
+
+  # ── Enterprise: Frontend UI/UX ──
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +85,7 @@ flutter:
 
   # Variables de entorno (plantilla incluida en el repo; copia a .env para valores reales)
   assets:
+    - .env
     - .env.example
     - assets/images/
 

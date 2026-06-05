@@ -20,18 +20,34 @@ class PdvCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = pdv.status == VisitStatus.enProceso;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        side: isActive
-            ? const BorderSide(color: AppColors.institutionalBlue, width: 2)
-            : const BorderSide(color: AppColors.inputBorder, width: 1),
+        border: Border.all(
+          color: isActive ? AppColors.institutionalBlue : AppColors.inputBorder,
+          width: isActive ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isActive 
+                ? AppColors.institutionalBlue.withValues(alpha: 0.15)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: isActive ? 12 : 6,
+            offset: const Offset(0, 3),
+            spreadRadius: isActive ? 2 : 0,
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: AppColors.institutionalBlue.withValues(alpha: 0.1),
+          highlightColor: AppColors.institutionalBlue.withValues(alpha: 0.05),
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,6 +114,7 @@ class PdvCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

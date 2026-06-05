@@ -35,11 +35,42 @@ class RouteProgressHeader extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 8,
-                  backgroundColor: AppColors.inputBorder,
-                  color: AppColors.activeBlue,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Container(
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.inputBorder.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOutCubic,
+                          height: 14,
+                          width: constraints.maxWidth * progress,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.institutionalBlue, AppColors.activeBlue],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.institutionalBlue.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

@@ -53,12 +53,22 @@ class VisitSummaryView extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Row(
-                          children: [
-                            Icon(Icons.check_circle, color: AppColors.success, size: 20),
-                            SizedBox(width: 8),
-                            Text('Visita completada y sincronizada', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
-                          ],
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.elasticOut,
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: value,
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: AppColors.success, size: 24),
+                                  SizedBox(width: 8),
+                                  Text('Visita completada y sincronizada', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.success, fontSize: 16)),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -183,12 +193,12 @@ void navigateToVisitSummary(
 }) {
   Navigator.of(context).pushReplacement<void, void>(
     MaterialPageRoute<void>(
-      builder: (_) => VisitSummaryView(
+      builder: (summaryContext) => VisitSummaryView(
         visit: visit,
         elapsedSeconds: elapsedSeconds,
         nextPdv: nextPdv,
         onContinue: () {
-          Navigator.of(context).pop();
+          Navigator.of(summaryContext).pop();
           onDone();
         },
       ),

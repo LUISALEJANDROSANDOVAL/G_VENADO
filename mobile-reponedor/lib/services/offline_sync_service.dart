@@ -1,61 +1,133 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../data/database_helper.dart';
 
-/// Servicio para persistir localmente las tareas completadas sin señal (RF-10).
+/// Servicio de persistencia offline robusto (RF-10) — Arquitectura Enterprise.
+///
+/// Reemplaza la implementación anterior basada en SharedPreferences/JSON
+/// por una basada en SQLite transaccional (ACID) que garantiza:
+///   - No se pierden datos si la app crashea a mitad de escritura.
+///   - Control individual de reintentos por registro (máx 5 intentos).
+///   - Consultas eficientes sin cargar toda la cola en memoria.
 class OfflineSyncService {
   OfflineSyncService._();
   static final OfflineSyncService instance = OfflineSyncService._();
 
-  static const String _keyPendingLogs = 'pending_task_logs';
+  final DatabaseHelper _db = DatabaseHelper.instance;
 
-  /// Guarda un log de tarea en la cola local persistente.
-  Future<void> savePendingTaskLog(Map<String, dynamic> log) async {
+  // ── Tareas pendientes ──────────────────────────────────────────────────
+
+  /// Guarda un log de tarea en la cola SQLite persistente.
+  Future<int> savePendingTaskLog(Map<String, dynamic> log) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String> currentList = prefs.getStringList(_keyPendingLogs) ?? [];
-      
-      currentList.add(jsonEncode(log));
-      await prefs.setStringList(_keyPendingLogs, currentList);
+      return await _db.insertPendingTask(log);
     } catch (e) {
       // ignore: avoid_print
-      print('[OfflineSyncService] Error guardando log offline: $e');
+      print('[OfflineSyncService] Error insertando tarea en SQLite: $e');
+      return -1;
     }
   }
 
-  /// Recupera todos los logs de tareas pendientes.
-  Future<List<Map<String, dynamic>>> getPendingTaskLogs() async {
+  /// Recupera todos los logs de tareas pendientes de sincronización.
+  /// Solo devuelve registros con menos de [maxRetries] intentos fallidos.
+  Future<List<Map<String, dynamic>>> getPendingTaskLogs({int maxRetries = 5}) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String>? currentList = prefs.getStringList(_keyPendingLogs);
-      if (currentList == null || currentList.isEmpty) return [];
-
-      return currentList
-          .map((item) => jsonDecode(item) as Map<String, dynamic>)
-          .toList();
+      return await _db.getPendingTasks(maxRetries: maxRetries);
     } catch (e) {
       // ignore: avoid_print
-      print('[OfflineSyncService] Error recuperando logs offline: $e');
+      print('[OfflineSyncService] Error consultando tareas pendientes: $e');
       return [];
     }
   }
 
-  /// Vacía la cola local de logs.
-  Future<void> clearPendingTaskLogs() async {
+  /// Marca una tarea como sincronizada exitosamente (la elimina de la cola).
+  Future<void> markTaskSynced(int id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keyPendingLogs);
+      await _db.deletePendingTask(id);
     } catch (e) {
       // ignore: avoid_print
-      print('[OfflineSyncService] Error limpiando logs offline: $e');
+      print('[OfflineSyncService] Error eliminando tarea sincronizada: $e');
     }
   }
 
-  /// Obtiene la cantidad de logs pendientes en la cola local.
+  /// Registra un intento fallido para un registro específico.
+  Future<void> markTaskRetry(int id) async {
+    try {
+      await _db.incrementRetryCount(id);
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error incrementando retry_count: $e');
+    }
+  }
+
+  /// Vacía la cola completa de tareas (tras sync total exitosa).
+  Future<void> clearPendingTaskLogs() async {
+    try {
+      await _db.clearAllPendingTasks();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error limpiando cola de tareas: $e');
+    }
+  }
+
+  // ── Evidencias pendientes ──────────────────────────────────────────────
+
+  /// Guarda una evidencia fotográfica en la cola de subida.
+  Future<int> savePendingEvidence({
+    required String localPath,
+    required String remotePath,
+    String mimeType = 'image/jpeg',
+    int? taskLogId,
+  }) async {
+    try {
+      return await _db.insertPendingEvidence(
+        localPath: localPath,
+        remotePath: remotePath,
+        mimeType: mimeType,
+        taskLogId: taskLogId,
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error insertando evidencia en SQLite: $e');
+      return -1;
+    }
+  }
+
+  /// Recupera todas las evidencias pendientes de subir al Storage.
+  Future<List<Map<String, dynamic>>> getPendingEvidences({int maxRetries = 5}) async {
+    try {
+      return await _db.getPendingEvidences(maxRetries: maxRetries);
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error consultando evidencias pendientes: $e');
+      return [];
+    }
+  }
+
+  /// Marca una evidencia como subida exitosamente (la elimina de la cola).
+  Future<void> markEvidenceSynced(int id) async {
+    try {
+      await _db.deletePendingEvidence(id);
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error eliminando evidencia sincronizada: $e');
+    }
+  }
+
+  /// Registra un intento fallido de subida para una evidencia.
+  Future<void> markEvidenceRetry(int id) async {
+    try {
+      await _db.incrementEvidenceRetryCount(id);
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OfflineSyncService] Error incrementando retry de evidencia: $e');
+    }
+  }
+
+  // ── Contadores ─────────────────────────────────────────────────────────
+
+  /// Obtiene la cantidad de tareas pendientes en la cola.
   Future<int> getPendingCount() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String>? currentList = prefs.getStringList(_keyPendingLogs);
-      return currentList?.length ?? 0;
+      return await _db.getTotalPendingCount();
     } catch (_) {
       return 0;
     }
