@@ -504,7 +504,7 @@ export default function ControlTowerDashboard() {
               </div>
             )}
             <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-              <div className={`p-4 md:p-5 mx-auto w-full flex-1 flex flex-col min-h-0 ${activeModule !== 'map' ? 'max-w-7xl overflow-y-auto space-y-4' : 'max-w-none'}`}>
+              <div className={`p-4 md:p-5 mx-auto w-full flex-1 flex flex-col min-h-0 ${activeModule === 'map' || activeModule === 'analytics' || activeModule === 'pdv' ? 'max-w-none overflow-y-auto space-y-4' : 'max-w-7xl overflow-y-auto space-y-4'}`}>
                 {/* Main Dashboard Module */}
                 {activeModule === 'dashboard' && (
                   <MainDashboard
@@ -654,8 +654,8 @@ export default function ControlTowerDashboard() {
 
                     {filteredData && (
                       <div className="space-y-4">
-                        <KPICards data={filteredData.kpis} />
-                        <AnalyticsCharts data={filteredData.analytics} />
+                        <KPICards data={filteredData.kpis} fleetCapacity={83} />
+                        <AnalyticsCharts data={filteredData.analytics} reponedores={mockData.reponedores} />
                       </div>
                     )}
                   </div>

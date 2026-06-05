@@ -51,7 +51,7 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1)
-  const [rowsPerPage, setRowsPerPage] = useState(25)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   // Reset page on search or filter change
   useEffect(() => {
@@ -278,7 +278,7 @@ export function PDVMaster({ pdvs, onRefresh }: PDVMasterProps) {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto animate-in fade-in">
+    <div className="space-y-6 w-full mx-auto animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Datos Maestros de PDV</h1>

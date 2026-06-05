@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/mapbox'
+import Map, { Marker, Source, Layer, NavigationControl, Popup } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, Pause, X, ChevronRight, Phone, Clock, Navigation, MapPin } from 'lucide-react'
+import { Play, Pause, X, ChevronRight, Phone, Clock, Navigation, MapPin, LocateFixed } from 'lucide-react'
 import type { PDV } from '@/lib/mock-data'
 
 interface LiveMapProps {
@@ -39,6 +39,9 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const [showWorkers, setShowWorkers] = useState(true)
   const [showRoute, setShowRoute] = useState(true)
   
+  const mapRef = useRef<any>(null)
+  const [hoverInfo, setHoverInfo] = useState<any>(null)
+  
   const [viewState, setViewState] = useState({
     longitude: -63.1812,
     latitude: -17.7862,
@@ -53,22 +56,44 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   const mainCities = ['Todas', 'Santa Cruz', 'La Paz', 'Cochabamba']
   const [selectedCity, setSelectedCity] = useState<string>('Todas')
 
+  const fitRouteBounds = () => {
+    if (!mapRef.current || !selectedWorker) return
+    const sequence: string[] = selectedWorker.sequence || []
+    let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90
+    let hasPoints = false
+
+    sequence.forEach(id => {
+      const p = pdvs.find(x => x.id === id)
+      if (p && p.lng !== undefined && p.lat !== undefined) {
+        if (p.lng < minLng) minLng = p.lng
+        if (p.lng > maxLng) maxLng = p.lng
+        if (p.lat < minLat) minLat = p.lat
+        if (p.lat > maxLat) maxLat = p.lat
+        hasPoints = true
+      }
+    })
+
+    if (hasPoints) {
+      mapRef.current.fitBounds(
+        [[minLng, minLat], [maxLng, maxLat]],
+        { padding: 80, duration: 1200 }
+      )
+    } else if (selectedWorker.lat && selectedWorker.lng) {
+      mapRef.current.flyTo({
+        center: [selectedWorker.lng, selectedWorker.lat],
+        zoom: 14,
+        duration: 1200
+      })
+    }
+  }
+
   useEffect(() => {
     if (selectedWorkerId) {
       const worker = reponedores.find(w => (w.dbUuid || w.id) === selectedWorkerId)
-      if (worker) {
-        if (worker.city) {
-          setSelectedCity(worker.city)
-        }
-        if (worker.lat && worker.lng) {
-          setViewState(prev => ({
-            ...prev,
-            longitude: worker.lng,
-            latitude: worker.lat,
-            zoom: 14
-          }))
-        }
+      if (worker && worker.city) {
+        setSelectedCity(worker.city)
       }
+      setTimeout(() => fitRouteBounds(), 150)
     }
   }, [selectedWorkerId, reponedores])
 
@@ -403,6 +428,13 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                  ))}
                </div>
             </div>
+
+            {selectedWorker && (
+               <div className="bg-background/60 backdrop-blur-md border border-border rounded-full px-3 py-1.5 flex items-center gap-2 shadow-xl hover:bg-background/80 transition-colors cursor-pointer" onClick={fitRouteBounds}>
+                 <LocateFixed className="w-4 h-4 text-primary" />
+                 <span className="text-xs font-semibold text-foreground">Centrar Ruta</span>
+               </div>
+            )}
           </div>
 
           {!isTokenValid ? (
@@ -412,6 +444,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
              </div>
           ) : (
             <Map
+              ref={mapRef}
               {...viewState}
               onMove={evt => setViewState(evt.viewState)}
               mapStyle="mapbox://styles/mapbox/dark-v11"
@@ -449,6 +482,11 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                 return (
                   <Marker key={pdv.id} longitude={pdv.lng} latitude={pdv.lat} anchor="center">
                     <div
+                      onMouseEnter={(e) => {
+                         e.stopPropagation()
+                         setHoverInfo(pdv)
+                      }}
+                      onMouseLeave={() => setHoverInfo(null)}
                       style={{
                         backgroundColor: bg,
                         width: size,
@@ -459,11 +497,35 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                         cursor: 'pointer',
                         boxShadow: `0 0 12px ${bg}`
                       }}
-                      title={pdv.nombre}
                     />
                   </Marker>
                 )
               })}
+
+              {hoverInfo && (
+                <Popup
+                  longitude={hoverInfo.lng}
+                  latitude={hoverInfo.lat}
+                  anchor="bottom"
+                  offset={15}
+                  closeButton={false}
+                  closeOnClick={false}
+                  className="z-[500] mapboxgl-popup-dark"
+                  maxWidth="300px"
+                >
+                  <div className="bg-background/90 backdrop-blur-md border border-border p-3 rounded-xl shadow-2xl min-w-[200px]">
+                    <h4 className="font-bold text-foreground text-sm mb-1">{hoverInfo.nombre}</h4>
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-muted-foreground shrink-0">
+                         {hoverInfo.type}
+                       </span>
+                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${visitedPdvIds.has(hoverInfo.id) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : activePdvIds.has(hoverInfo.id) ? 'bg-primary/10 text-primary border-primary/20' : 'bg-muted/40 text-muted-foreground border-border'}`}>
+                         {visitedPdvIds.has(hoverInfo.id) ? "✓ Completado" : activePdvIds.has(hoverInfo.id) ? "⏳ En ruta" : "💤 Pendiente"}
+                       </span>
+                    </div>
+                  </div>
+                </Popup>
+              )}
 
               {/* Active Workers */}
               {activeWorkers.map((worker: any) => {
