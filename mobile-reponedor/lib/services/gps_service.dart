@@ -1,19 +1,24 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'session_service.dart';
 import 'supabase_service.dart';
 
-/// Servicio de rastreo GPS en tiempo real (RF-08).
+/// Servicio de rastreo GPS en tiempo real (RF-08) — Arquitectura Enterprise.
+///
+/// Mejoras sobre la versión MVP:
+///   - Integra [FlutterBackgroundService] para mantener el GPS activo
+///     incluso con la pantalla bloqueada (Foreground Service en Android).
+///   - Muestra una notificación persistente "Jornada en curso" que impide
+///     que el SO Android (modo Doze) mate el proceso.
+///   - Mantiene compatibilidad con la API existente (startLiveTracking, etc).
 ///
 /// Cada [_intervalSeconds] segundos obtiene la posición real del dispositivo
 /// y hace un UPSERT en la tabla `reponedor_locations` de Supabase.
-/// El supervisor web recibe las actualizaciones al instante gracias a
-/// Supabase Realtime (WebSockets).
-///
-/// En Flutter Web (Chrome) el paquete geolocator solicita el permiso de
-/// ubicación nativo del navegador. Para simular coordenadas distintas
-/// usa DevTools → Sensors → Geolocation.
 class GpsService {
   GpsService._();
   static final GpsService instance = GpsService._();
@@ -22,10 +27,16 @@ class GpsService {
   static const int _intervalSeconds = 30;
   static const double _geofenceRadiusMeters = 50.0;
 
+  // ── Notificación del Foreground Service ────────────────────────────────────
+  static const String _notificationChannelId = 'gps_tracking_channel';
+  static const String _notificationChannelName = 'Rastreo GPS';
+  static const int _notificationId = 888;
+
   // ── Estado interno ────────────────────────────────────────────────────────
   Timer? _trackingTimer;
   Position? _lastPosition;
   bool _isTracking = false;
+  final FlutterBackgroundService _backgroundService = FlutterBackgroundService();
 
   /// Última posición conocida del dispositivo.
   Position? get lastPosition => _lastPosition;
@@ -33,10 +44,91 @@ class GpsService {
   /// Indica si el rastreo está activo actualmente.
   bool get isTracking => _isTracking;
 
+  // ── Inicialización del servicio en segundo plano ──────────────────────────
+
+  /// Configura el Foreground Service de Android.
+  /// Debe llamarse UNA sola vez desde main.dart al arrancar la app.
+  static Future<void> initializeBackgroundService() async {
+    final service = FlutterBackgroundService();
+
+    // Crear canal de notificación para Android
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    const androidChannel = AndroidNotificationChannel(
+      _notificationChannelId,
+      _notificationChannelName,
+      description: 'Notificación del rastreo GPS del reponedor',
+      importance: Importance.low, // No hace sonido, solo muestra la barra
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+
+    await service.configure(
+      iosConfiguration: IosConfiguration(
+        autoStart: false,
+        onForeground: _onServiceStart,
+        onBackground: _onIosBackground,
+      ),
+      androidConfiguration: AndroidConfiguration(
+        onStart: _onServiceStart,
+        autoStart: false,
+        isForegroundMode: true,
+        notificationChannelId: _notificationChannelId,
+        foregroundServiceNotificationId: _notificationId,
+        initialNotificationTitle: 'TRACE V — Reponedores',
+        initialNotificationContent: 'Rastreo de jornada listo',
+      ),
+    );
+  }
+
+  /// Handler que se ejecuta cuando el servicio de fondo arranca.
+  @pragma('vm:entry-point')
+  static void _onServiceStart(ServiceInstance service) async {
+    if (service is AndroidServiceInstance) {
+      service.on('setAsForeground').listen((_) {
+        service.setAsForegroundService();
+      });
+      service.on('setAsBackground').listen((_) {
+        service.setAsBackgroundService();
+      });
+    }
+
+    service.on('stopService').listen((_) {
+      service.stopSelf();
+    });
+
+    // Timer periódico que corre dentro del servicio de fondo
+    Timer.periodic(const Duration(seconds: _intervalSeconds), (_) async {
+      if (service is AndroidServiceInstance) {
+        if (await service.isForegroundService()) {
+          service.setForegroundNotificationInfo(
+            title: 'TRACE V — Jornada en curso',
+            content: 'GPS activo · Última actualización: ${_formatTime(DateTime.now())}',
+          );
+        }
+      }
+
+      // El rastreo real se maneja en la instancia principal
+      // El servicio solo mantiene vivo el proceso
+    });
+  }
+
+  @pragma('vm:entry-point')
+  static Future<bool> _onIosBackground(ServiceInstance service) async {
+    return true;
+  }
+
+  static String _formatTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
+  }
+
   // ── API Pública ───────────────────────────────────────────────────────────
 
   /// Inicia el rastreo GPS periódico y comienza a escribir en Supabase.
   ///
+  /// En Android: activa el Foreground Service para que el SO no mate el GPS.
   /// Solicita permiso al usuario si aún no fue concedido.
   /// Si el permiso es denegado permanentemente, retorna sin activar el rastreo.
   Future<void> startLiveTracking() async {
@@ -50,6 +142,19 @@ class GpsService {
     }
 
     _isTracking = true;
+
+    // Activar el Foreground Service (notificación persistente en Android)
+    if (!kIsWeb) {
+      try {
+        final isRunning = await _backgroundService.isRunning();
+        if (!isRunning) {
+          await _backgroundService.startService();
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('[GpsService] No se pudo iniciar Foreground Service: $e');
+      }
+    }
 
     // Primera lectura inmediata para que el supervisor vea al reponedor
     // en el momento que inicia la sesión, sin esperar 30 segundos.
@@ -74,6 +179,17 @@ class GpsService {
     _trackingTimer = null;
     _isTracking = false;
     _lastPosition = null;
+
+    // Detener el Foreground Service
+    if (!kIsWeb) {
+      try {
+        _backgroundService.invoke('stopService');
+      } catch (e) {
+        // ignore: avoid_print
+        print('[GpsService] Error deteniendo Foreground Service: $e');
+      }
+    }
+
     // ignore: avoid_print
     print('[GpsService] Rastreo GPS detenido.');
   }
@@ -134,7 +250,7 @@ class GpsService {
   /// nueva coordenada. Nunca acumula filas históricas.
   Future<void> _uploadToSupabase(double latitude, double longitude) async {
     try {
-      final userId = SupabaseService.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       if (userId == null) {
         // Modo demo sin sesión — no hay nada que guardar
         return;

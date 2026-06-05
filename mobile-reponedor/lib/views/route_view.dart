@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/pdv.dart';
@@ -7,8 +8,9 @@ import '../models/visit.dart';
 import '../services/app_connection_service.dart';
 import '../services/gps_service.dart';
 import '../services/route_repository.dart';
+import '../services/session_service.dart';
 import '../theme/app_colors.dart';
-import '../widgets/mock_route_map.dart';
+import '../widgets/mapbox_route_map.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/pdv_card.dart';
 import '../widgets/route_progress_header.dart';
@@ -34,9 +36,13 @@ class _RouteViewState extends State<RouteView> {
   void initState() {
     super.initState();
     _loadRoute();
+    // El GPS se inicia dentro de _loadRoute() una vez que se
+    // confirma la sesión del usuario, para garantizar que
+    // SessionService.currentUserId no sea null al primer ciclo.
   }
 
   /// Carga la ruta desde Supabase (RF-06/RF-07) con fallback a MockData.
+  /// Inicia el GPS en cuanto el userId está disponible (RF-08).
   Future<void> _loadRoute() async {
     setState(() {
       _isLoadingRoute = true;
@@ -44,13 +50,17 @@ class _RouteViewState extends State<RouteView> {
     });
     try {
       // Obtiene el userId autenticado si hay sesión activa
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
       if (mounted) {
         setState(() {
           _pdvs = pdvs;
           _isLoadingRoute = false;
         });
+      }
+      // Iniciar GPS DESPUÉS de confirmar la sesión, así userId no es null
+      if (userId != null && userId.isNotEmpty) {
+        unawaited(GpsService.instance.startLiveTracking());
       }
     } catch (e) {
       if (mounted) {
@@ -59,6 +69,11 @@ class _RouteViewState extends State<RouteView> {
           _isLoadingRoute = false;
           _loadError = e.toString();
         });
+      }
+      // Intentar iniciar GPS igualmente si hay sesión
+      final userId = SessionService.instance.currentUserId;
+      if (userId != null && userId.isNotEmpty) {
+        unawaited(GpsService.instance.startLiveTracking());
       }
     }
   }
@@ -84,7 +99,7 @@ class _RouteViewState extends State<RouteView> {
     // Invalida caché para forzar recarga desde Supabase
     RouteRepository.instance.invalidateCache();
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = SessionService.instance.currentUserId;
       final pdvs = await RouteRepository.instance.fetchDailyRoute(userId: userId);
       if (mounted) setState(() => _pdvs = pdvs);
     } catch (_) {
@@ -100,11 +115,12 @@ class _RouteViewState extends State<RouteView> {
     );
   }
 
-  void _logout() {
+  void _logout() async {
     // Detener el GPS y limpiar caché antes de cerrar sesión
     GpsService.instance.stopTracking();
     RouteRepository.instance.invalidateCache();
-    Supabase.instance.client.auth.signOut();
+    await SessionService.instance.clearSession();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil<void>(
       MaterialPageRoute<void>(builder: (_) => const LoginView()),
       (_) => false,
@@ -254,11 +270,6 @@ class _RouteViewState extends State<RouteView> {
         title: const Text('Mi Ruta'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.wifi_find),
-            tooltip: 'Simular conexión',
-            onPressed: AppConnectionService.instance.cycleStatusDemo,
-          ),
-          IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sincronizar',
             onPressed: () => AppConnectionService.instance.manualSync(),
@@ -301,7 +312,7 @@ class _RouteViewState extends State<RouteView> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       children: [
                         RouteProgressHeader(
-                          reponedorName: MockData.mockUser.name,
+                          reponedorName: SessionService.instance.currentUserName ?? 'Reponedor',
                           dateLabel: _dateLabel,
                           completedVisits: _completed,
                           totalVisits: _pdvs.length,
@@ -334,15 +345,31 @@ class _RouteViewState extends State<RouteView> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        MockRouteMap(pdvs: _pdvs, activePdvId: active?.id),
+                        MapboxRouteMap(pdvs: _pdvs, activePdvId: active?.id),
                         const SizedBox(height: 8),
                         _GpsTrackingHint(isActive: !_journeyComplete),
                         const SizedBox(height: 20),
                         Text('Puntos de venta', style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 10),
-                        ..._pdvs.map(
-                          (pdv) => PdvCard(pdv: pdv, onTap: () => _openVisit(pdv)),
-                        ),
+                        ...List.generate(_pdvs.length, (index) {
+                          final pdv = _pdvs[index];
+                          // Staggered delay (simulado con curvo y duration ligeramente más largos para elementos posteriores)
+                          return TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: Duration(milliseconds: 400 + (index * 50)),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return Transform.translate(
+                                offset: Offset(0, 30 * (1 - value)),
+                                child: Opacity(
+                                  opacity: value,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: PdvCard(pdv: pdv, onTap: () => _openVisit(pdv)),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -491,7 +518,7 @@ class _GpsTrackingHint extends StatelessWidget {
         Icon(Icons.gps_fixed, size: 14, color: AppColors.success.withValues(alpha: 0.8)),
         const SizedBox(width: 6),
         Text(
-          'Rastreo de trayecto activo — cada 30 s (simulación RF-08)',
+          'Rastreo GPS activo — posición enviada cada 30 s',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
         ),
       ],

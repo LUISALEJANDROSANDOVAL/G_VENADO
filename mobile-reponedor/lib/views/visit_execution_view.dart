@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/evidence.dart';
@@ -18,6 +23,7 @@ import '../widgets/geofence_status_chip.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/sync_status_card.dart';
 import '../widgets/task_checklist_item.dart';
+import '../widgets/animated_chronometer.dart';
 import 'visit_summary_view.dart';
 
 /// Pantalla de ejecución de visita dentro del PDV.
@@ -71,10 +77,17 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     final pdvLng = _visit.pdv.longitude;
 
     if (pdvLat == null || pdvLng == null) {
-      // El PDV no tiene coordenadas GPS reales — el reponedor usa el botón manual.
+      // El PDV no tiene coordenadas GPS registradas.
+      // Habilitar el checklist de inmediato para no bloquear el trabajo.
+      if (mounted) {
+        setState(() {
+          _visit = _visit.copyWith(geofenceStatus: GeofenceStatus.dentroDelRadio);
+        });
+      }
       return;
     }
 
+    // El PDV tiene coordenadas reales: GPS automático cada 10 segundos.
     _geofenceTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
       final isInside = GpsService.instance.isInsidePdv(
@@ -132,17 +145,6 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  void _simulateArrival() {
-    setState(() {
-      _visit = _visit.copyWith(geofenceStatus: GeofenceStatus.dentroDelRadio);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Geofence: dentro del radio — checklist habilitado'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   void _onTaskChecked(int index, bool? value) {
     if (!_checklistEnabled) return;
@@ -189,6 +191,45 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     });
   }
 
+  /// Guarda la foto en el directorio permanente de la app (no en caché temporal)
+  /// y la comprime para ahorrar datos móviles al reponedor.
+  Future<String?> _saveToPermStorage(XFile imageFile) async {
+    try {
+      if (kIsWeb) return imageFile.path; // Web no tiene filesystem real
+
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final evidenceDir = Directory(p.join(documentsDir.path, 'evidences'));
+      if (!await evidenceDir.exists()) {
+        await evidenceDir.create(recursive: true);
+      }
+
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(imageFile.path)}';
+      final targetPath = p.join(evidenceDir.path, fileName);
+
+      // Comprimir y redimensionar (4K → 1080p máx, calidad 75%)
+      final compressedFile = await FlutterImageCompress.compressAndGetFile(
+        imageFile.path,
+        targetPath,
+        quality: 75,
+        minWidth: 1080,
+        minHeight: 1080,
+      );
+
+      if (compressedFile != null) {
+        return compressedFile.path;
+      }
+
+      // Fallback: copiar sin comprimir si la compresión falla
+      final original = File(imageFile.path);
+      final copied = await original.copy(targetPath);
+      return copied.path;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VisitExecutionView] Error guardando foto en almacenamiento permanente: $e');
+      return imageFile.path; // Fallback a la ruta original de caché
+    }
+  }
+
   Future<void> _takeEvidence() async {
     if (!_checklistEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -227,6 +268,11 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     if (imageFile == null) return;
     if (!mounted) return;
 
+    // ── Enterprise: Mover de caché temporal a almacenamiento permanente ──
+    final permanentPath = await _saveToPermStorage(imageFile);
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -249,7 +295,8 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     bool isUploaded = false;
 
     try {
-      final bytes = await imageFile.readAsBytes();
+      final file = File(permanentPath ?? imageFile.path);
+      final bytes = await file.readAsBytes();
       final fileName = '${type.name}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       
       publicUrl = await RouteRepository.instance.uploadEvidence(
@@ -291,7 +338,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
         status: isUploaded ? EvidenceStatus.sincronizada : EvidenceStatus.capturada,
         type: type,
         mockColor: color,
-        filePath: imageFile!.path,
+        filePath: permanentPath ?? imageFile!.path,
         publicUrl: publicUrl,
       );
 
@@ -328,6 +375,13 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
       return;
     }
 
+    // Cancelar timers antes de cualquier operación async para evitar
+    // que disparen setState sobre el widget desmontado.
+    _visitTimer?.cancel();
+    _visitTimer = null;
+    _geofenceTimer?.cancel();
+    _geofenceTimer = null;
+
     setState(() {
       _isFinishing = true;
       _visit = _visit.copyWith(
@@ -347,6 +401,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
               : 300;
           
           String? photoUrl;
+          String? localPhotoPath;
           if (task.requiresPhoto) {
             final uploadedEv = _visit.evidences.firstWhere(
               (e) => e.status != EvidenceStatus.pendiente && (e.publicUrl != null || e.filePath != null),
@@ -357,11 +412,12 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
                 type: EvidenceType.general,
               ),
             );
-            
+
             if (uploadedEv.id.isNotEmpty) {
-              photoUrl = uploadedEv.publicUrl ?? uploadedEv.filePath;
-            } else {
-              photoUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
+              // Foto sincronizada: usar URL pública de Supabase Storage
+              // Foto local (sin señal): guardar ruta local para re-subir al sync
+              photoUrl = uploadedEv.publicUrl;
+              localPhotoPath = uploadedEv.filePath;
             }
           }
 
@@ -372,6 +428,7 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
             endTime: now,
             durationSeconds: duration,
             photoUrl: photoUrl,
+            localPhotoPath: localPhotoPath,
           );
         }
       }
@@ -390,7 +447,11 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     );
     final nextPdv = MockData.nextPendingPdv(widget.allPdvs, afterPdvId: _visit.pdv.id);
 
+    // Notificar al padre ANTES de navegar para que actualice la lista
+    // mientras la RouteView todavía está montada en el stack.
     widget.onVisitCompleted?.call(completedVisit);
+
+    if (!mounted) return;
 
     navigateToVisitSummary(
       context,
@@ -409,24 +470,19 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
       appBar: AppBar(
         title: Text(_visit.pdv.name, overflow: TextOverflow.ellipsis),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _checklistEnabled ? _takeEvidence : null,
-        icon: const Icon(Icons.camera_alt),
-        label: const Text('Tomar Evidencia'),
-      ),
       body: Column(
         children: [
           const OfflineBanner(),
           _buildFixedHeader(context),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
                 _buildChronometer(context),
                 const SizedBox(height: 16),
                 GeofenceStatusChip(
                   status: _visit.geofenceStatus,
-                  onSimulateArrival: _simulateArrival,
+                  hasPdvCoordinates: _visit.pdv.latitude != null && _visit.pdv.longitude != null,
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -534,53 +590,88 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
 
   Widget _buildChronometer(BuildContext context) {
     return Card(
+      color: Colors.transparent,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: const RoundedRectangleBorder(side: BorderSide.none),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          children: [
-            Text('Tiempo de visita', style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
-            Text(
-              formatDuration(_elapsedSeconds),
-              style: const TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-                color: AppColors.institutionalBlue,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
+        child: AnimatedChronometer(
+          elapsedSeconds: _elapsedSeconds,
+          estimatedSeconds: _parseEstimatedSeconds(_visit.pdv.estimatedTime),
         ),
       ),
     );
   }
 
+  int _parseEstimatedSeconds(String timeStr) {
+    // Convierte "00:15" a segundos = 15 * 60 = 900
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length == 2) {
+        final hours = int.parse(parts[0]);
+        final mins = int.parse(parts[1]);
+        return (hours * 3600) + (mins * 60);
+      }
+    } catch (_) {}
+    return 1800; // 30 minutos por defecto
+  }
+
+
   Widget _buildFinishButton() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: const BoxDecoration(
         color: AppColors.cardBackground,
         border: Border(top: BorderSide(color: AppColors.inputBorder)),
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _isFinishing ? null : _finishVisit,
-            child: _isFinishing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Finalizar Visita y Sincronizar'),
-          ),
+        child: Row(
+          children: [
+            // Botón cámara: solo activo cuando el checklist está habilitado
+            SizedBox(
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: _checklistEnabled && !_isFinishing ? _takeEvidence : null,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Evidencia'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: _checklistEnabled
+                        ? AppColors.institutionalBlue
+                        : AppColors.inputBorder,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Botón principal: Finalizar Visita
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _isFinishing ? null : _finishVisit,
+                  child: _isFinishing
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Finalizar Visita'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

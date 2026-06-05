@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 /// Tema Material 3 personalizado para FieldOps Reponedores (Light Theme Premium).
@@ -18,32 +19,61 @@ class AppTheme {
       onError: Colors.white,
     );
 
+    final baseTextTheme = GoogleFonts.interTextTheme().copyWith(
+      headlineMedium: GoogleFonts.inter(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: AppColors.primaryText,
+      ),
+      titleLarge: GoogleFonts.inter(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: AppColors.primaryText,
+      ),
+      titleMedium: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: AppColors.primaryText,
+      ),
+      bodyLarge: GoogleFonts.inter(fontSize: 16, color: AppColors.primaryText, fontWeight: FontWeight.normal),
+      bodyMedium: GoogleFonts.inter(fontSize: 14, color: AppColors.primaryText, fontWeight: FontWeight.normal),
+      bodySmall: GoogleFonts.inter(fontSize: 12, color: AppColors.secondaryText, fontWeight: FontWeight.normal),
+      labelLarge: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: AppColors.primaryText,
+      ),
+    );
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.darkBackground,
-      appBarTheme: const AppBarTheme(
+      textTheme: baseTextTheme,
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
         foregroundColor: AppColors.primaryText,
         elevation: 0.5,
         shadowColor: AppColors.inputBorder,
         centerTitle: true,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: AppColors.primaryText,
           letterSpacing: 0.5,
         ),
-        iconTheme: IconThemeData(color: AppColors.primaryText),
+        iconTheme: const IconThemeData(color: AppColors.primaryText),
       ),
       cardTheme: CardThemeData(
         color: AppColors.cardBackground,
-        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.inputBorder, width: 1),
+          side: BorderSide(color: AppColors.inputBorder.withValues(alpha: 0.5), width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -52,9 +82,10 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          elevation: 0,
+          elevation: 2,
+          shadowColor: AppColors.institutionalBlue.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -85,12 +116,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.error),
         ),
-        labelStyle: const TextStyle(color: AppColors.secondaryText, fontSize: 14),
-        hintStyle: const TextStyle(color: AppColors.textLightGrey, fontSize: 14),
+        labelStyle: GoogleFonts.inter(color: AppColors.secondaryText, fontSize: 14),
+        hintStyle: GoogleFonts.inter(color: AppColors.textLightGrey, fontSize: 14),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: Colors.white,
-        labelStyle: const TextStyle(color: AppColors.primaryText, fontSize: 13, fontWeight: FontWeight.w500),
+        labelStyle: GoogleFonts.inter(color: AppColors.primaryText, fontSize: 13, fontWeight: FontWeight.w500),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         side: const BorderSide(color: AppColors.inputBorder),
@@ -114,31 +145,6 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
       dividerColor: AppColors.inputBorder,
-      textTheme: const TextTheme(
-        headlineMedium: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primaryText,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primaryText,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: AppColors.primaryText,
-        ),
-        bodyLarge: TextStyle(fontSize: 16, color: AppColors.primaryText, fontWeight: FontWeight.normal),
-        bodyMedium: TextStyle(fontSize: 14, color: AppColors.primaryText, fontWeight: FontWeight.normal),
-        bodySmall: TextStyle(fontSize: 12, color: AppColors.secondaryText, fontWeight: FontWeight.normal),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primaryText,
-        ),
-      ),
     );
   }
 }
