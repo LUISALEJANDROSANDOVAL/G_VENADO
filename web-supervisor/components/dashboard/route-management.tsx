@@ -882,7 +882,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   return (
     <div className="space-y-6 w-full max-w-7xl mx-auto">
       {/* ── Tab switcher ── */}
-      <div className="flex gap-1 p-1 bg-muted/40 rounded-xl border border-border w-fit">
+      <div className="flex gap-6 border-b border-border w-full">
         {[
           { id: 'operations', label: 'Operaciones del Día', icon: Zap },
           { id: 'history', label: 'Historial de Rutas', icon: History },
@@ -895,10 +895,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={[
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                'flex items-center gap-2 pb-3 text-sm font-medium transition-all duration-200 border-b-2 -mb-[1px]',
                 active
-                  ? 'bg-card shadow-sm text-foreground border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
               ].join(' ')}
             >
               <Icon className="h-4 w-4" />
@@ -1379,7 +1379,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   className={[
                     "font-bold text-sm px-6 py-5 rounded-xl shadow-md transition-all duration-200 cursor-pointer shrink-0 gap-2",
                     tomorrowPublished
-                      ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/20 hover:text-emerald-400 cursor-default"
+                      ? "bg-muted/50 text-muted-foreground border border-border hover:bg-muted/50 hover:text-muted-foreground cursor-default shadow-none"
                       : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-950/20"
                   ].join(" ")}
                 >
@@ -1404,12 +1404,12 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
               {/* Status Alert Banner */}
               {tomorrowPublished ? (
-                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                <div className="flex items-center gap-3 p-4 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 rounded-xl text-emerald-800 dark:text-emerald-400">
                   <Check className="h-5 w-5 shrink-0" />
                   <div>
                     <h4 className="font-semibold text-sm">Jornada Publicada</h4>
-                    <p className="text-xs text-emerald-400/80 mt-0.5">
-                      Las rutas y secuencias de visitas ya están aprobadas e impactadas en el backend de Supabase. Los reponedores recibirán las actualizaciones en su aplicación móvil al iniciar su jornada.
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400/80 mt-0.5">
+                      Las rutas han sido aprobadas y sincronizadas. Los reponedores ya tienen la información en su app móvil para iniciar su jornada.
                     </p>
                   </div>
                 </div>
@@ -1525,21 +1525,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                             <span>•</span>
                             <span>{estHours} hrs</span>
                             <span>•</span>
-                            <span className="text-emerald-400 font-bold">+{estEff}%</span>
+                            <span className="text-muted-foreground font-bold">+{estEff}% tiempo est.</span>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {/* Status badge */}
-                            {(tomorrowPublished || assignedWorkers[p.reponedorId]) ? (
-                              <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                ✓ Asignada
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full border text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
-                                Sugerida
-                              </span>
-                            )}
-
                             {/* Per-worker Assign Route Button */}
                             <button
                               onClick={(e) => {

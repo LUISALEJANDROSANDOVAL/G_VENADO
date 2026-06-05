@@ -55,7 +55,7 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
 
   return (
     <aside className="w-64 border-r border-sidebar-border bg-[#00457C] h-full flex flex-col justify-between shrink-0 text-white select-none">
-      
+
       {/* Top Section: Logo and Navigation */}
       <div className="flex flex-col">
         {/* Logo (Matching the style of the screenshot) */}
@@ -82,14 +82,14 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
                   onClick={() => onModuleChange(module.id)}
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer text-left',
-                    isActive 
-                      ? 'bg-white/12 text-white shadow-sm font-bold' 
+                    isActive
+                      ? 'bg-white/12 text-white shadow-sm font-bold'
                       : 'text-white/80 hover:text-white hover:bg-white/5'
                   )}
                 >
                   <Icon className={cn('h-4.5 w-4.5 transition-transform duration-200', isActive ? 'scale-105' : '')} />
                   <span>{module.label}</span>
-                  
+
                   {/* Premium Notification Badge next to Map Module */}
                   {module.id === 'map' && activeReponedoresCount !== undefined && activeReponedoresCount > 0 && (
                     <span className="ml-auto bg-white text-[#00457C] text-[10px] font-extrabold px-1.5 py-0.5 rounded-md min-w-[20px] text-center shadow-sm">
@@ -106,7 +106,7 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
       {/* Bottom Section: Theme Toggle and Logout */}
       <div className="p-4 border-t border-sidebar-border/30 space-y-4">
         {/* Toggle Dark Mode */}
-        <div 
+        <div
           onClick={toggleTheme}
           className="flex items-center justify-between px-3 py-2 text-white/70 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
         >
@@ -115,26 +115,32 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
             <span>{isDark ? 'Modo Claro' : 'Modo Oscuro'}</span>
           </div>
           <div className="relative inline-flex items-center cursor-pointer">
-            <input 
-              type="checkbox" 
-              className="sr-only peer" 
-              checked={isDark} 
-              onChange={() => {}} // handled by parent div click
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={isDark}
+              onChange={() => { }} // handled by parent div click
             />
             <div className={cn(
               "w-9 h-5 rounded-full transition-all relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all",
-              isDark 
-                ? "bg-emerald-500 after:translate-x-full" 
+              isDark
+                ? "bg-emerald-500 after:translate-x-full"
                 : "bg-white/20"
             )}></div>
           </div>
         </div>
 
         {/* Logout Button */}
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
+
           className="w-full justify-start gap-3 bg-transparent hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl py-2.5 px-3 font-semibold border-none transition-all active:scale-98 cursor-pointer text-xs"
-          onClick={() => setShowLogoutConfirm(true)}
+          onClick={() => {
+            if (confirm('¿Desea cerrar la sesión de supervisión?')) {
+              console.log('Logging out...')
+            }
+          }}
+
         >
           <LogOut className="h-4 w-4" />
           <span>Cerrar Sesión</span>
@@ -154,16 +160,16 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
                 <p className="text-xs text-muted-foreground mt-0.5">¿Desea cerrar la sesión de supervisión?</p>
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-2 mt-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowLogoutConfirm(false)}
                 className="h-9 px-4 rounded-xl text-xs font-semibold text-foreground border-border hover:bg-muted transition-all"
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   localStorage.removeItem('supervisor_session')
                   window.location.reload()
