@@ -15,6 +15,7 @@ import '../widgets/offline_banner.dart';
 import '../widgets/pdv_card.dart';
 import '../widgets/route_progress_header.dart';
 import '../widgets/route_summary_card.dart';
+import '../widgets/skeleton_pdv_card.dart';
 import 'login_view.dart';
 import 'visit_execution_view.dart';
 
@@ -127,8 +128,7 @@ class _RouteViewState extends State<RouteView> {
     );
   }
 
-  void _openNavigation() {
-    final target = _activePdv;
+  void _openNavigation(Pdv target) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.cardBackground,
@@ -148,7 +148,7 @@ class _RouteViewState extends State<RouteView> {
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
-                if (target != null) ...[
+                if (true) ...[
                   const SizedBox(height: 12),
                   Text(
                     'Destino: ${target.name}',
@@ -173,7 +173,7 @@ class _RouteViewState extends State<RouteView> {
                   color: AppColors.success,
                   onTap: () {
                     Navigator.pop(context);
-                    _showNavSnackbar('Google Maps');
+                    _showNavSnackbar('Google Maps', target);
                   },
                 ),
                 const SizedBox(height: 10),
@@ -183,7 +183,7 @@ class _RouteViewState extends State<RouteView> {
                   color: AppColors.activeBlue,
                   onTap: () {
                     Navigator.pop(context);
-                    _showNavSnackbar('Waze');
+                    _showNavSnackbar('Waze', target);
                   },
                 ),
               ],
@@ -194,10 +194,10 @@ class _RouteViewState extends State<RouteView> {
     );
   }
 
-  void _showNavSnackbar(String app) {
+  void _showNavSnackbar(String app, Pdv target) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Simulación: abriendo $app hacia ${_activePdv?.name ?? "PDV"}'),
+        content: Text('Simulación: abriendo $app hacia ${target.name}'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -249,14 +249,21 @@ class _RouteViewState extends State<RouteView> {
     _markPdvInProgress(pdv.id);
 
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => VisitExecutionView(
+      PageRouteBuilder<void>(
+        pageBuilder: (context, animation, secondaryAnimation) => VisitExecutionView(
           initialVisit: MockData.visitForPdv(pdv),
           allPdvs: _pdvs,
           onVisitCompleted: (Visit completed) {
             _markPdvCompleted(completed.pdv.id);
           },
         ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubic;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
       ),
     );
   }
@@ -266,20 +273,35 @@ class _RouteViewState extends State<RouteView> {
     final active = _activePdv;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi Ruta'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sincronizar',
-            onPressed: () => AppConnectionService.instance.manualSync(),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFF9ECEC), AppColors.background],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-            onPressed: _logout,
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: false,
+            title: const Text('Dashboard de Ruta', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppColors.traceRed)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.sync, color: AppColors.traceRed),
+                tooltip: 'Sincronizar',
+                onPressed: () => AppConnectionService.instance.manualSync(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout, color: AppColors.traceRed),
+                tooltip: 'Cerrar sesión',
+                onPressed: _logout,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       body: Column(
         children: [
@@ -291,18 +313,16 @@ class _RouteViewState extends State<RouteView> {
             _SourceBanner(isDemo: false, message: 'Ruta cargada desde Supabase ✓'),
           Expanded(
             child: _isLoadingRoute
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text(
-                          'Cargando ruta desde Supabase...',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                ? ListView(
+                    padding: const EdgeInsets.all(16),
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      Container(height: 100, decoration: BoxDecoration(color: AppColors.cardBackground, borderRadius: BorderRadius.circular(16))),
+                      const SizedBox(height: 20),
+                      Container(height: 120, decoration: BoxDecoration(color: AppColors.cardBackground, borderRadius: BorderRadius.circular(16))),
+                      const SizedBox(height: 30),
+                      ...List.generate(4, (_) => const SkeletonPdvCard()),
+                    ],
                   )
                 : RefreshIndicator(
                     onRefresh: _refreshRoute,
@@ -322,6 +342,7 @@ class _RouteViewState extends State<RouteView> {
                           pending: _pending,
                           completed: _completed,
                           pendingSync: _pendingSync,
+                          total: _pdvs.length,
                         ),
                         if (_journeyComplete) ...[
                           const SizedBox(height: 16),
@@ -367,38 +388,18 @@ class _RouteViewState extends State<RouteView> {
                                 ),
                               );
                             },
-                            child: PdvCard(pdv: pdv, onTap: () => _openVisit(pdv)),
+                            child: PdvCard(
+                              pdv: pdv, 
+                              onTap: () => _openVisit(pdv),
+                              onNavigateTap: pdv.status == VisitStatus.enProceso ? () => _openNavigation(pdv) : null,
+                            ),
                           );
                         }),
                       ],
                     ),
                   ),
           ),
-          if (!_isLoadingRoute && !_journeyComplete) _buildBottomAction(context),
-
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomAction(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(top: BorderSide(color: AppColors.inputBorder)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: _activePdv != null ? _openNavigation : null,
-            icon: const Icon(Icons.navigation),
-            label: const Text('Abrir Navegación'),
-          ),
-        ),
       ),
     );
   }

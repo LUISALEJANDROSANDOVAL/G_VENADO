@@ -35,43 +35,64 @@ class VisitSummaryView extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                visit.pdv.name,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            CustomerTypeBadge(type: visit.pdv.customerType),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: const Duration(milliseconds: 600),
-                          curve: Curves.elasticOut,
-                          builder: (context, value, child) {
-                            return Transform.scale(
-                              scale: value,
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.check_circle, color: AppColors.success, size: 24),
-                                  SizedBox(width: 8),
-                                  Text('Visita completada y sincronizada', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.success, fontSize: 16)),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.success.withValues(alpha: 0.05), AppColors.success.withValues(alpha: 0.15)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                  ),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        duration: const Duration(milliseconds: 1000),
+                        curve: Curves.elasticOut,
+                        builder: (context, value, child) {
+                          return Transform.scale(
+                            scale: value,
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.success.withValues(alpha: 0.4 * value),
+                                    blurRadius: 16 * value,
+                                    spreadRadius: 4 * value,
+                                  )
+                                ]
+                              ),
+                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        '¡Visita Completada!',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        visit.pdv.name,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      CustomerTypeBadge(type: visit.pdv.customerType),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
