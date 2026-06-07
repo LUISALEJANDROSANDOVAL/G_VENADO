@@ -464,6 +464,75 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
     );
   }
 
+  void _openNavigation() {
+    final target = _visit.pdv;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Abrir navegación',
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Destino: ${target.name}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  target.address,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                _NavOptionTile(
+                  icon: Icons.map,
+                  label: 'Google Maps',
+                  color: AppColors.success,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showNavSnackbar('Google Maps', target.name);
+                  },
+                ),
+                const SizedBox(height: 10),
+                _NavOptionTile(
+                  icon: Icons.navigation,
+                  label: 'Waze',
+                  color: AppColors.activeBlue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showNavSnackbar('Waze', target.name);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNavSnackbar(String app, String targetName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Simulación: abriendo $app hacia $targetName'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -493,22 +562,47 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
                 VisitTasksProgress(tasks: _visit.tasks),
                 const SizedBox(height: 12),
                 if (!_checklistEnabled)
-                  Card(
-                    color: AppColors.error.withValues(alpha: 0.08),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: AppColors.error, width: 1),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(Icons.lock_outline, color: AppColors.error, size: 18),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Checklist bloqueado hasta validar geofence',
-                              style: TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.bold),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.lock_outline, color: AppColors.error, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Fuera del rango',
+                                  style: TextStyle(fontSize: 14, color: AppColors.error, fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Acércate al local para desbloquear tareas',
+                                  style: TextStyle(fontSize: 12, color: AppColors.secondaryText),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -557,31 +651,108 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
   }
 
   Widget _buildFixedHeader(BuildContext context) {
+    final completedTasks = _visit.tasks.where((t) => t.isCompleted).length;
+    final totalTasks = _visit.tasks.length;
+    final progress = totalTasks > 0 ? completedTasks / totalTasks : 0.0;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      decoration: BoxDecoration(
         color: AppColors.cardBackground,
-        border: Border(bottom: BorderSide(color: AppColors.inputBorder)),
+        border: const Border(bottom: BorderSide(color: AppColors.inputBorder)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(_visit.pdv.name, style: Theme.of(context).textTheme.titleMedium),
+          Hero(
+            tag: 'pdv-number-${_visit.pdv.id}',
+            child: Material(
+              color: Colors.transparent,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 3,
+                      backgroundColor: AppColors.inputBorder.withValues(alpha: 0.5),
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
+                    ),
+                  ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _visit.pdv.status == VisitStatus.completada ? AppColors.success : AppColors.traceRed,
+                      shape: BoxShape.circle,
+                    ),
+                    child: _visit.pdv.status == VisitStatus.completada
+                      ? const Icon(Icons.check, color: Colors.white, size: 24)
+                      : Text(
+                          '${_visit.pdv.visitNumber}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                  ),
+                ],
               ),
-              CustomerTypeBadge(type: _visit.pdv.customerType),
-            ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.login, size: 14, color: AppColors.secondaryText),
-              const SizedBox(width: 4),
-              Text('Llegada: $_arrivalLabel', style: Theme.of(context).textTheme.bodySmall),
-            ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _visit.pdv.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    CustomerTypeBadge(type: _visit.pdv.customerType),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.login, size: 14, color: AppColors.secondaryText),
+                    const SizedBox(width: 4),
+                    Text('Llegada: $_arrivalLabel', style: Theme.of(context).textTheme.bodySmall),
+                    const Spacer(),
+                    Text(
+                      '$completedTasks de $totalTasks tareas',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: progress == 1.0 ? AppColors.success : AppColors.traceRed,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -630,25 +801,35 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
         top: false,
         child: Row(
           children: [
-            // Botón cámara: solo activo cuando el checklist está habilitado
-            SizedBox(
-              height: 56,
-              child: OutlinedButton.icon(
-                onPressed: _checklistEnabled && !_isFinishing ? _takeEvidence : null,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Evidencia'),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: _checklistEnabled
-                        ? AppColors.institutionalBlue
-                        : AppColors.inputBorder,
-                    width: 1.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
+            // Botón contextual: Navegar vs Cámara
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: SizedBox(
+                key: ValueKey(_checklistEnabled),
+                height: 56,
+                child: _checklistEnabled
+                    ? OutlinedButton.icon(
+                        onPressed: !_isFinishing ? _takeEvidence : null,
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Evidencia'),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.institutionalBlue, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _openNavigation,
+                        icon: const Icon(Icons.directions),
+                        label: const Text('Navegar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.traceRed,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -672,6 +853,45 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavOptionTile extends StatelessWidget {
+  const _NavOptionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.darkBackground,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 14),
+              Text(label, style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              const Icon(Icons.open_in_new, size: 18, color: AppColors.secondaryText),
+            ],
+          ),
         ),
       ),
     );

@@ -46,24 +46,33 @@ class TaskChecklistItem extends StatelessWidget {
 
     return Opacity(
       opacity: isLocked ? 0.45 : 1.0,
-      child: Card(
+      child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: task.isCompleted ? AppColors.success.withValues(alpha: 0.3) : AppColors.inputBorder,
+          border: Border.all(
+            color: task.isCompleted ? AppColors.success.withValues(alpha: 0.3) : AppColors.inputBorder.withValues(alpha: 0.5),
             width: task.isCompleted ? 1.5 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: InkWell(
-          onTap: isLocked ? null : () => onCheckedChanged(!task.isCompleted),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isLocked ? null : () => onCheckedChanged(!task.isCompleted),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                 // Icono checkbox personalizado estilo iOS/Premium
                 Icon(
                   task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
@@ -132,6 +141,7 @@ class TaskChecklistItem extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

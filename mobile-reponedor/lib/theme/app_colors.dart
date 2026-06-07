@@ -37,11 +37,14 @@ class AppColors {
   static const paretoRed = primaryRed;
 
   static const darkBackground = lightBackground;    // Apunta al fondo claro
+  static const background = lightBackground;        // Alias para el fondo principal
   static const cardBackground = whiteSurface;       // Apunta a la tarjeta blanca
   static const inputBorder = lightGrayBorder;
   static const primaryText = textDarkCharcoal;       // El texto principal ahora es oscuro
   static const secondaryText = textMediumGrey;       // El texto secundario es gris medio
+  static const dimGrayText = textLightGrey;          // Alias para textos gris claro
   static const detallistaGray = darkGray;
+  static const traceRed = primaryRed;                // Alias para el rojo de TRACE V
 
   // ── Adicionales para compatibilidad de vistas ────────────────────────────
   static const darkSlateGray = lightBackground;

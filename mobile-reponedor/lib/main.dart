@@ -9,7 +9,7 @@ import 'services/session_service.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 import 'views/login_view.dart';
-import 'views/route_view.dart';
+import 'views/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -112,7 +112,7 @@ class _FieldOpsAppState extends State<FieldOpsApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: SessionService.instance.isLoggedIn
-          ? const RouteView()
+          ? const MainShell()
           : const LoginView(),
     );
   }
