@@ -1465,3 +1465,65 @@ export async function authenticateUser(emailInput: string, passwordInput: string
     return { success: false, error: e.message || 'Error de conexión con el servidor.' }
   }
 }
+
+export async function getAdminDashboardData() {
+  try {
+    const { data: users, error: usersErr } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .order('name', { ascending: true })
+
+    const { data: pdvs, error: pdvsErr } = await supabaseAdmin
+      .from('points_of_sale')
+      .select('*')
+      .order('name', { ascending: true })
+
+    if (usersErr || pdvsErr) {
+      throw new Error(`Error fetching admin data: ${usersErr?.message || pdvsErr?.message}`)
+    }
+
+    return {
+      success: true,
+      users: users || [],
+      pdvs: pdvs || []
+    }
+  } catch (e: any) {
+    console.error('Error in getAdminDashboardData Server Action:', e)
+    return { success: false, error: e.message || 'Error al cargar datos de administrador.' }
+  }
+}
+
+export async function adminCreateUser(data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('users').insert({
+      name: data.name,
+      email: data.email,
+      role: data.role || 'REPONEDOR',
+      is_active: true,
+      departamento: data.departamento || null
+    })
+    if (error) throw new Error(error.message)
+    return { success: true }
+  } catch (e: any) {
+    console.error('Error creating user:', e)
+    return { error: e.message || 'Error al crear usuario.' }
+  }
+}
+
+export async function adminUpdateUser(id: string, data: any) {
+  try {
+    const { error } = await supabaseAdmin.from('users').update({
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      is_active: data.is_active,
+      departamento: data.departamento || null
+    }).eq('id', id)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  } catch (e: any) {
+    console.error('Error updating user:', e)
+    return { error: e.message || 'Error al actualizar usuario.' }
+  }
+}
+
