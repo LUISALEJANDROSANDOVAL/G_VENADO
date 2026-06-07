@@ -1424,3 +1424,44 @@ export async function fetchRealAnalytics(startDateStr?: string, endDateStr?: str
     return { error: e.message }
   }
 }
+
+export async function authenticateUser(emailInput: string, passwordInput: string) {
+  try {
+    const email = emailInput.trim().toLowerCase()
+    
+    // Call our verify_user_credentials database RPC function
+    const { data, error } = await supabaseAdmin.rpc('verify_user_credentials', {
+      p_email: email,
+      p_password: passwordInput
+    })
+
+    if (error) {
+      console.error('Error invoking verify_user_credentials RPC:', error)
+      return { success: false, error: 'Error interno de la base de datos al autenticar.' }
+    }
+
+    if (!data || data.length === 0) {
+      return { success: false, error: 'Correo o contraseña incorrectos.' }
+    }
+
+    const userProfile = data[0]
+
+    // Verify role - only SUPERVISOR or ADMIN roles are permitted to access web-supervisor
+    if (userProfile.role_name !== 'SUPERVISOR' && userProfile.role_name !== 'ADMIN') {
+      return { success: false, error: 'Acceso denegado: rol no autorizado para este panel.' }
+    }
+
+    return {
+      success: true,
+      user: {
+        id: userProfile.id,
+        name: userProfile.name,
+        email: userProfile.email,
+        role: userProfile.role_name
+      }
+    }
+  } catch (e: any) {
+    console.error('Authentication exception in Server Action:', e)
+    return { success: false, error: e.message || 'Error de conexión con el servidor.' }
+  }
+}

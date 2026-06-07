@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { authenticateUser } from '@/app/actions'
 
 interface LoginProps {
   onLoginSuccess: () => void
 }
 
 export function Login({ onLoginSuccess }: LoginProps) {
-  const [email, setEmail] = useState('supervisor@venado.com')
+  const [email, setEmail] = useState('supervisor@gmail.com')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
@@ -24,7 +25,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
     return () => clearTimeout(timer)
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
@@ -38,25 +39,41 @@ export function Login({ onLoginSuccess }: LoginProps) {
       return
     }
 
-    // Simulate database lookup / credentials verification
-    setTimeout(() => {
-      // Allow any login with supervisor@venado.com for ease of access (or any email for testing fallback)
-      if (email.trim().toLowerCase() === 'supervisor@venado.com') {
-        localStorage.setItem('supervisor_session', JSON.stringify({ email, rememberMe, timestamp: Date.now() }))
+    try {
+      const res = await authenticateUser(email, password)
+
+      if (res.success && res.user) {
+        localStorage.setItem(
+          'supervisor_session',
+          JSON.stringify({
+            email: res.user.email,
+            name: res.user.name,
+            role: res.user.role,
+            rememberMe,
+            timestamp: Date.now()
+          })
+        )
         toast({
           title: "¡Acceso concedido!",
-          description: "Bienvenido a la Torre de Control Venado.",
+          description: `Bienvenido a la Torre de Control Venado, ${res.user.name}.`,
         })
         onLoginSuccess()
       } else {
         toast({
           variant: "destructive",
           title: "Error de credenciales",
-          description: "Correo o contraseña incorrectos. Utilice 'supervisor@venado.com'.",
+          description: res.error || "Correo o contraseña incorrectos.",
         })
       }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error de conexión",
+        description: err.message || "No se pudo establecer conexión con el servidor.",
+      })
+    } finally {
       setIsSubmitting(false)
-    }, 800)
+    }
   }
 
   return (

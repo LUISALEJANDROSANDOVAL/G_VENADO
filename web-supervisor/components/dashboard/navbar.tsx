@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Bell, Settings, User, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,6 +13,25 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function Navbar() {
+  const [currentUser, setCurrentUser] = useState({ name: 'Supervisor General', email: 'supervisor@gmail.com' })
+
+  useEffect(() => {
+    try {
+      const sessionStr = localStorage.getItem('supervisor_session')
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr)
+        if (session.email) {
+          setCurrentUser({
+            name: session.name || (session.email.split('@')[0] === 'supervisor' ? 'Supervisor General' : 'Administrador'),
+            email: session.email
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Error reading auth session in navbar:', e)
+    }
+  }, [])
+
   return (
     <nav className="border-b border-border bg-card">
       <div className="flex h-16 items-center justify-between px-6">
@@ -45,8 +65,8 @@ export function Navbar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-card border border-border shadow-md rounded-xl p-1.5">
               <DropdownMenuLabel className="flex flex-col gap-0.5 px-2.5 py-2">
-                <span className="font-bold text-sm text-foreground">Supervisor General</span>
-                <span className="text-[11px] text-muted-foreground font-medium">supervisor@venado.com</span>
+                <span className="font-bold text-sm text-foreground">{currentUser.name}</span>
+                <span className="text-[11px] text-muted-foreground font-medium">{currentUser.email}</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border my-1" />
               <DropdownMenuItem 
