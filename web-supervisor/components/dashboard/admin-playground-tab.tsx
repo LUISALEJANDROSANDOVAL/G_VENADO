@@ -1,15 +1,22 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox'
+import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Sliders, MapPin, Play, RefreshCw, Layers } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Sliders, MapPin, Play, RefreshCw, Compass, Tag, Store, Clock, Building2, LocateFixed } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+
+const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
+  'Todas': { lat: -16.2902, lng: -63.5887, zoom: 5 },
+  'Cochabamba': { lat: -17.3895, lng: -66.1568, zoom: 12 },
+  'Santa Cruz': { lat: -17.7862, lng: -63.1812, zoom: 12 },
+  'La Paz': { lat: -16.5000, lng: -68.1500, zoom: 12 },
+}
 
 export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
   const { toast } = useToast()
@@ -23,6 +30,13 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
   const [isSimulating, setIsSimulating] = useState(false)
   const [simResults, setSimResults] = useState<any>(null)
 
+  // Filter states matching supervisor live map look
+  const [selectedCity, setSelectedCity] = useState('Todas')
+  const [showPareto, setShowPareto] = useState(true)
+  const [showMayorista, setShowMayorista] = useState(true)
+  const [showDetallista, setShowDetallista] = useState(true)
+  const [showRoute, setShowRoute] = useState(true)
+
   // Map state
   const mapRef = useRef<any>(null)
   const [viewState, setViewState] = useState({
@@ -33,24 +47,35 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
 
   // Safe subset of PDVs to render on map (limit to 30 for performance in simulation)
   const mapPdvs = useMemo(() => {
-    return pdvs.slice(0, 30).map((p, idx) => ({
+    let filtered = pdvs.map(p => ({
       id: p.id,
-      name: p.name,
+      name: p.nombre ?? p.name ?? '',
       lat: Number(p.latitude || p.lat || -17.7862),
       lng: Number(p.longitude || p.lng || -63.1812),
-      category: p.category || 'PARETO'
+      category: (p.category ?? p.type ?? 'DETALLISTA').toUpperCase(),
+      city: p.city ?? p.market ?? 'Santa Cruz'
     }))
-  }, [pdvs])
+
+    filtered = filtered.filter(p => {
+      if (selectedCity !== 'Todas' && p.city !== selectedCity) return false
+      if (p.category === 'PARETO' && !showPareto) return false
+      if (p.category === 'MAYORISTA' && !showMayorista) return false
+      if (p.category === 'DETALLISTA' && !showDetallista) return false
+      return true
+    })
+
+    return filtered.slice(0, 30)
+  }, [pdvs, selectedCity, showPareto, showMayorista, showDetallista])
 
   // GeoJSON line for route simulation
   const routeGeoJSON = useMemo(() => {
     if (!simResults || mapPdvs.length < 2) return null
     const coordinates = mapPdvs.map(p => [p.lng, p.lat])
     return {
-      type: 'Feature',
+      type: 'Feature' as const,
       properties: {},
       geometry: {
-        type: 'LineString',
+        type: 'LineString' as const,
         coordinates: coordinates
       }
     }
@@ -72,181 +97,278 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
     }, 1500)
   }
 
+  const handleCityChange = (city: string) => {
+    setSelectedCity(city)
+    if (CITY_COORDINATES[city]) {
+      setViewState(prev => ({
+        ...prev,
+        longitude: CITY_COORDINATES[city].lng,
+        latitude: CITY_COORDINATES[city].lat,
+        zoom: CITY_COORDINATES[city].zoom
+      }))
+    }
+  }
+
+  const fitRouteBounds = () => {
+    if (!mapRef.current || mapPdvs.length === 0) return
+    let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90
+    mapPdvs.forEach(p => {
+      if (p.lng < minLng) minLng = p.lng
+      if (p.lng > maxLng) maxLng = p.lng
+      if (p.lat < minLat) minLat = p.lat
+      if (p.lat > maxLat) maxLat = p.lat
+    })
+    mapRef.current.fitBounds(
+      [[minLng, minLat], [maxLng, maxLat]],
+      { padding: 80, duration: 1200 }
+    )
+  }
+
+  const isTokenValid = MAPBOX_TOKEN && MAPBOX_TOKEN !== 'PEGA_TU_TOKEN_AQUI'
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-200 text-left">
-      <div>
-        <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Sandbox y Playground de Rutas Logísticas</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Ajusta los parámetros operativos de la IA para recalcular las rutas de reparto más eficientes de Bolivia.
-        </p>
-      </div>
+    <div className="flex h-full w-full bg-background gap-4 rounded-xl overflow-hidden font-sans text-left">
+        
+        {/* LEFT COLUMN: Controls & Settings */}
+        <div className="w-[380px] bg-card rounded-[32px] p-6 flex flex-col shadow-2xl border border-border relative overflow-hidden shrink-0">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8 z-10">
+            <div>
+              <h2 className="text-foreground font-bold text-xl tracking-tight">
+                Calibración de IA
+              </h2>
+              <p className="text-muted-foreground text-xs mt-1 font-medium">
+                Parámetros de Simulación de Rutas
+              </p>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Parameters Column */}
-        <div className="space-y-6">
-          <Card className="border-slate-200 shadow-sm dark:bg-slate-900/30 dark:border-slate-800">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-850 pb-4">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Sliders className="h-4.5 w-4.5 text-emerald-500" />
-                <span>Coeficientes del Algoritmo</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              {/* Avg Speed */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Velocidad de Traslado</label>
-                  <span className="text-xs font-bold text-emerald-500">{avgSpeed} km/h</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="10" 
-                  max="60" 
-                  value={avgSpeed}
-                  onChange={e => setAvgSpeed(Number(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
+          {/* Sliders Content */}
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar z-10 space-y-6">
+            
+            {/* Avg Speed */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-muted-foreground" /> Velocidad de Traslado
+                </Label>
+                <span className="text-xs font-bold text-blue-500">{avgSpeed} km/h</span>
               </div>
+              <input 
+                type="range" 
+                min="10" 
+                max="60" 
+                value={avgSpeed}
+                onChange={e => setAvgSpeed(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
 
-              {/* Time in PDV */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tiempo Base en PDV</label>
-                  <span className="text-xs font-bold text-emerald-500">{minTimePDV} mins</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="5" 
-                  max="45" 
-                  value={minTimePDV}
-                  onChange={e => setMinTimePDV(Number(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
+            {/* Time in PDV */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Tiempo Base en PDV
+                </Label>
+                <span className="text-xs font-bold text-blue-500">{minTimePDV} mins</span>
               </div>
+              <input 
+                type="range" 
+                min="5" 
+                max="45" 
+                value={minTimePDV}
+                onChange={e => setMinTimePDV(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
 
-              {/* Geofence Check-in */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Radio de Geocerca</label>
-                  <span className="text-xs font-bold text-emerald-500">{geofenceRadius} metros</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="20" 
-                  max="200" 
-                  step="10"
-                  value={geofenceRadius}
-                  onChange={e => setGeofenceRadius(Number(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
+            {/* Geofence Check-in */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Compass className="h-3.5 w-3.5 text-muted-foreground" /> Radio de Geocerca
+                </Label>
+                <span className="text-xs font-bold text-blue-500">{geofenceRadius} metros</span>
               </div>
+              <input 
+                type="range" 
+                min="20" 
+                max="200" 
+                step="10"
+                value={geofenceRadius}
+                onChange={e => setGeofenceRadius(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
 
-              <Button 
-                onClick={handleSimulate} 
-                disabled={isSimulating}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
-              >
-                {isSimulating ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Calculando Iteraciones...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 fill-white" />
-                    <span>Ejecutar Simulación IA</span>
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+            <Button 
+              onClick={handleSimulate} 
+              disabled={isSimulating}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
+            >
+              {isSimulating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Calculando Iteraciones...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 fill-white" />
+                  <span>Ejecutar Simulación IA</span>
+                </>
+              )}
+            </Button>
 
-          {/* Results Panel */}
-          {simResults && (
-            <Card className="border-slate-200 shadow-sm dark:bg-slate-900/30 dark:border-slate-800 animate-in slide-in-from-bottom-2 duration-300">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-850 pb-3">
-                <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resultados de la Calibración</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-500">Distancia teórica total</span>
-                  <span className="text-slate-800 dark:text-white font-bold">{simResults.totalDistance} km</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-500">Tiempo de jornada total</span>
-                  <span className="text-slate-800 dark:text-white font-bold">{(simResults.optimalTime / 60).toFixed(1)} horas</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-500">Tasa de Efectividad Estimada</span>
-                  <span className="text-emerald-500 font-bold">{simResults.coverage}%</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Map Column */}
-        <div className="xl:col-span-2">
-          <Card className="border-slate-200 shadow-sm dark:bg-slate-900/30 dark:border-slate-800 h-full flex flex-col min-h-[500px]">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-850 pb-4">
-              <CardTitle className="text-sm font-bold flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-emerald-500" />
-                  <span>Mapa de Simulación de Ruta</span>
-                </span>
-                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-none font-bold text-[9px]">
-                  {mapPdvs.length} Tiendas Cargadas
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 p-0 relative overflow-hidden">
-              <div className="absolute inset-0 bg-slate-100 dark:bg-slate-950">
-                {MAPBOX_TOKEN ? (
-                  <Map
-                    {...viewState}
-                    onMove={evt => setViewState(evt.viewState)}
-                    mapStyle="mapbox://styles/mapbox/streets-v11"
-                    mapboxAccessToken={MAPBOX_TOKEN}
-                    style={{ width: '100%', height: '100%' }}
-                  >
-                    {/* Render PDV markers */}
-                    {mapPdvs.map(pdv => (
-                      <Marker key={pdv.id} latitude={pdv.lat} longitude={pdv.lng}>
-                        <MapPin className={`h-5 w-5 ${
-                          pdv.category === 'PARETO' 
-                            ? 'text-rose-500 fill-rose-500' 
-                            : pdv.category === 'MAYORISTA' 
-                              ? 'text-amber-500 fill-amber-500' 
-                              : 'text-emerald-500 fill-emerald-500'
-                        }`} />
-                      </Marker>
-                    ))}
-
-                    {/* Render simulated route path */}
-                    {routeGeoJSON && (
-                      <Source id="sim-route" type="geojson" data={routeGeoJSON}>
-                        <Layer
-                          id="route-line"
-                          type="line"
-                          paint={{
-                            'line-color': '#10b981',
-                            'line-width': 4,
-                            'line-opacity': 0.85
-                          }}
-                        />
-                      </Source>
-                    )}
-                  </Map>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                    Falta el token de Mapbox para renderizar el Sandbox de Simulación.
+            {/* Results Panel */}
+            {simResults && (
+              <div className="pt-4 border-t border-border animate-in slide-in-from-bottom-2 duration-350">
+                <div className="bg-slate-500/5 rounded-2xl p-4 flex flex-col border border-border space-y-2.5">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Resultados de la Calibración</h4>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-muted-foreground">Distancia teórica total:</span>
+                    <span className="text-foreground font-bold">{simResults.totalDistance} km</span>
                   </div>
-                )}
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-muted-foreground">Tiempo de jornada total:</span>
+                    <span className="text-foreground font-bold">{(simResults.optimalTime / 60).toFixed(1)} horas</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-muted-foreground">Efectividad Estimada:</span>
+                    <span className="text-emerald-500 font-bold">{simResults.coverage}%</span>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Map & Legends */}
+        <div className="flex-1 flex flex-col gap-4 relative min-w-0">
+          
+          {/* MAP CONTAINER */}
+          <div className="flex-1 bg-card rounded-[32px] overflow-hidden relative border border-border shadow-2xl">
+            
+            {/* Glassmorphic Controls Overlay */}
+            <div className="absolute top-6 left-6 z-[400] flex gap-3">
+              <div className="bg-background/60 backdrop-blur-md border border-border rounded-full px-1.5 py-1.5 flex items-center gap-1 shadow-xl">
+                {['Todas', 'Santa Cruz', 'La Paz', 'Cochabamba'].map((city) => (
+                  <button
+                    key={city}
+                    onClick={() => handleCityChange(city)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
+                      selectedCity === city
+                        ? 'bg-[#7b61ff] text-white shadow-[0_0_12px_rgba(123,97,255,0.5)]'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+
+              {simResults && (
+                <div 
+                  className="bg-background/60 backdrop-blur-md border border-border rounded-full px-3 py-1.5 flex items-center gap-2 shadow-xl hover:bg-background/80 transition-colors cursor-pointer" 
+                  onClick={fitRouteBounds}
+                >
+                  <LocateFixed className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-semibold text-foreground font-sans">Centrar Simulación</span>
+                </div>
+              )}
+            </div>
+
+            {!isTokenValid ? (
+              <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[1000]">
+                <h3 className="text-xl font-bold text-rose-500 mb-2">Falta Mapbox Token</h3>
+                <p className="text-sm text-slate-300">Añade tu token en .env.local</p>
+              </div>
+            ) : (
+              <Map
+                ref={mapRef}
+                {...viewState}
+                onMove={evt => setViewState(evt.viewState)}
+                mapStyle="mapbox://styles/mapbox/dark-v11"
+                mapboxAccessToken={MAPBOX_TOKEN}
+                interactive={true}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <NavigationControl position="top-right" />
+
+                {/* Render PDV markers styled identically to LiveMap */}
+                {mapPdvs.map(pdv => {
+                  let bg = '#9ca3af'
+                  if (pdv.category === 'PARETO') bg = '#ff3366'
+                  if (pdv.category === 'MAYORISTA') bg = '#33ccff'
+                  if (pdv.category === 'DETALLISTA') bg = '#a1a1aa'
+                  
+                  return (
+                    <Marker key={pdv.id} longitude={pdv.lng} latitude={pdv.lat} anchor="center">
+                      <div
+                        style={{
+                          backgroundColor: bg,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '4px',
+                          transform: 'rotate(45deg)',
+                          opacity: 0.8,
+                          cursor: 'pointer',
+                          boxShadow: `0 0 12px ${bg}`
+                        }}
+                      />
+                    </Marker>
+                  )
+                })}
+
+                {/* Render simulated route path */}
+                {routeGeoJSON && showRoute && (
+                  <Source id="sim-route" type="geojson" data={routeGeoJSON}>
+                    <Layer
+                      id="route-line"
+                      type="line"
+                      paint={{
+                        'line-color': '#7b61ff',
+                        'line-width': 4,
+                        'line-opacity': 0.8
+                      }}
+                    />
+                  </Source>
+                )}
+              </Map>
+            )}
+          </div>
+
+          {/* BOTTOM FILTER PANEL */}
+          <div className="bg-card rounded-[32px] p-6 shrink-0 border border-border shadow-2xl relative z-10">
+            <div className="flex flex-wrap items-center gap-4">
+              <FilterBtn active={showPareto} onClick={() => setShowPareto(!showPareto)} color="#ff3366" label="PDVs Pareto" />
+              <FilterBtn active={showMayorista} onClick={() => setShowMayorista(!showMayorista)} color="#33ccff" label="PDVs Mayoristas" />
+              <FilterBtn active={showDetallista} onClick={() => setShowDetallista(!showDetallista)} color="#a1a1aa" label="PDVs Detallistas" />
+              <FilterBtn active={showRoute} onClick={() => setShowRoute(!showRoute)} color="#7b61ff" label="Simulación de Ruta" />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+  )
+}
+
+function FilterBtn({ active, onClick, color, label }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-300 border ${
+        active ? 'bg-muted border-border text-foreground' : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
+      }`}
+    >
+      <div 
+         className="w-3 h-3 rounded-sm"
+         style={{ 
+            backgroundColor: active ? color : 'transparent',
+            border: `2px solid ${active ? color : '#71717a'}`,
+            boxShadow: active ? `0 0 10px ${color}` : 'none' 
+         }} 
+      />
+      <span className="text-sm font-medium">{label}</span>
+    </button>
   )
 }

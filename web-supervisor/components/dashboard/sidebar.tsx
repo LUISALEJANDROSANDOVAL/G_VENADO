@@ -61,6 +61,26 @@ function IconDatabase({ className }: { className?: string }) {
   )
 }
 
+function IconUsers({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function IconShield({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  )
+}
+
 interface SidebarProps {
   activeModule: string
   onModuleChange: (module: string) => void
@@ -89,12 +109,32 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  // Avoid SSR hydration mismatch
+  const [userRole, setUserRole] = useState<string>('SUPERVISOR')
+
+  // Avoid SSR hydration mismatch and detect role
   useEffect(() => {
     setMounted(true)
+    try {
+      const sessionStr = localStorage.getItem('supervisor_session')
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr)
+        if (session.role) {
+          setUserRole(session.role)
+        }
+      }
+    } catch (e) {
+      console.error('Error reading role in sidebar:', e)
+    }
   }, [])
 
-  const modules = [
+  const modules = userRole === 'ADMIN' ? [
+    { id: 'overview',   label: 'Resumen General',    icon: IconDashboard },
+    { id: 'users',      label: 'Gestión de Personal', icon: IconUsers },
+    { id: 'pdvs',       label: 'Directorio PDVs',     icon: IconDatabase },
+    { id: 'audit',      label: 'Auditoría & Logs',    icon: IconShield },
+    { id: 'media',      label: 'Media QA Center',     icon: IconMap },
+    { id: 'playground', label: 'Sandbox de Rutas',    icon: IconRoute },
+  ] : [
     { id: 'dashboard', label: 'Inicio', icon: IconDashboard },
     { id: 'map', label: 'Mapa en Vivo', icon: IconMap },
     { id: 'routes', label: 'Control de Rutas', icon: IconRoute },
@@ -321,7 +361,7 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
               <Button
                 onClick={() => {
                   localStorage.removeItem('supervisor_session')
-                  window.location.reload()
+                  window.location.href = '/'
                 }}
                 className="h-9 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-sm border-none cursor-pointer"
               >
