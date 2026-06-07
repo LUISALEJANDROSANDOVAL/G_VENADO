@@ -31,10 +31,11 @@ import { useToast } from '@/hooks/use-toast'
 
 interface PDVMasterProps {
   pdvs: PDV[]
+  photoEvidences?: any[]
   onRefresh?: () => void
 }
 
-export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
+export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<ClientType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'visited' | 'unvisited'>('all')
@@ -46,6 +47,7 @@ export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
   const [copiedPdvId, setCopiedPdvId] = useState<string | null>(null)
   const [selectedPdvHistory, setSelectedPdvHistory] = useState<PDV | null>(null)
   const [selectedPdvReport, setSelectedPdvReport] = useState<PDV | null>(null)
+  const [viewPhotoUrl, setViewPhotoUrl] = useState<string | null>(null)
   
   // Inconsistency Report form state
   const [reportType, setReportType] = useState('coordinates')
@@ -176,6 +178,20 @@ export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
 
   // Helper to generate visit history for Drawer
   const getPDVHistory = (pdv: PDV) => {
+    const realEvidences = photoEvidences.filter(ev => ev.pdvName === pdv.nombre || ev.pdvName === pdv.id);
+    
+    if (realEvidences.length > 0) {
+      return realEvidences.map(ev => ({
+        date: new Date(ev.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        reponedor: ev.reponedorName,
+        status: ev.afterUrl ? 'Completado ✓' : 'En Proceso ⏳',
+        details: ev.taskName,
+        beforeUrl: ev.beforeUrl,
+        afterUrl: ev.afterUrl
+      }))
+    }
+
+    // Fallback si no hay evidencias reales
     const isVisited = pdv.visited
     const history = []
     
@@ -188,20 +204,26 @@ export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
         date: dateToday,
         reponedor: 'Carlos Méndez',
         status: 'Completado ✓',
-        details: 'Checklist completado con éxito. Se colocó 100% de exhibidores en góndolas principales y material POP en la entrada.'
+        details: 'Checklist completado con éxito. Se colocó 100% de exhibidores en góndolas principales y material POP en la entrada.',
+        beforeUrl: null,
+        afterUrl: null
       })
     }
     history.push({
       date: '28/05/2026, 11:15',
       reponedor: 'Ana García',
       status: 'Completado ✓',
-      details: 'Limpieza de exhibidores realizada. Se reabasteció el stock de productos Pareto. Inventario en góndolas reportado sin anomalías.'
+      details: 'Limpieza de exhibidores realizada. Se reabasteció el stock de productos Pareto. Inventario en góndolas reportado sin anomalías.',
+      beforeUrl: null,
+      afterUrl: null
     })
     history.push({
       date: '25/05/2026, 09:40',
       reponedor: 'José Torres',
       status: 'Alerta / Incompleto ⚠️',
-      details: 'No se pudo completar el bandeo debido a la falta de espacio en góndola. El encargado del PDV solicitó reagendar limpieza profunda.'
+      details: 'No se pudo completar el bandeo debido a la falta de espacio en góndola. El encargado del PDV solicitó reagendar limpieza profunda.',
+      beforeUrl: null,
+      afterUrl: null
     })
     return history
   }
@@ -483,7 +505,7 @@ export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
               </TableHeader>
               <TableBody>
                 {paginatedPDVs.map((pdv) => (
-                  <TableRow key={pdv.id} className="border-border hover:bg-muted/30 transition-colors">
+                  <TableRow key={pdv.id} className="border-border group hover:bg-muted/30 hover:translate-x-1 transition-all duration-300 cursor-default">
                     <TableCell className="py-3.5">
                       <div className="flex flex-col">
                         <span 
@@ -752,12 +774,43 @@ export function PDVsTab({ pdvs, onRefresh }: PDVMasterProps) {
                         <p className="text-xs text-muted-foreground/80 leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/40">
                           {visit.details}
                         </p>
+                        {(visit.beforeUrl || visit.afterUrl) && (
+                          <div className="flex gap-2 mt-2">
+                            {visit.beforeUrl && (
+                              <img 
+                                src={visit.beforeUrl} 
+                                alt="Antes" 
+                                className="h-16 w-16 object-cover rounded cursor-pointer border border-border hover:opacity-80 transition-opacity"
+                                onClick={() => setViewPhotoUrl(visit.beforeUrl)}
+                              />
+                            )}
+                            {visit.afterUrl && (
+                              <img 
+                                src={visit.afterUrl} 
+                                alt="Después" 
+                                className="h-16 w-16 object-cover rounded cursor-pointer border border-border hover:opacity-80 transition-opacity"
+                                onClick={() => setViewPhotoUrl(visit.afterUrl)}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {viewPhotoUrl && (
+        <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setViewPhotoUrl(null)}>
+          <div className="relative max-w-4xl w-full max-h-[88vh] rounded-xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <img src={viewPhotoUrl} alt="Evidencia ampliada" className="w-full h-auto max-h-[88vh] object-contain" />
+            <button className="absolute top-3 right-3 bg-black/60 text-white rounded-full p-2 hover:bg-black/80 transition-colors flex items-center gap-1.5 text-xs cursor-pointer" onClick={() => setViewPhotoUrl(null)}>
+              <X className="h-3.5 w-3.5" /> Cerrar
+            </button>
           </div>
         </div>
       )}

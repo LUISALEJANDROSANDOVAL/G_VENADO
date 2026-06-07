@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, X, ChevronRight, Phone, Clock, Navigation, MapPin, LocateFixed } from 'lucide-react'
 import type { PDV } from '@/lib/mock-data'
+import { supabase } from '@/lib/supabase'
 
 interface LiveMapProps {
   pdvs: PDV[]
@@ -42,6 +43,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
   
   const mapRef = useRef<any>(null)
   const [hoverInfo, setHoverInfo] = useState<any>(null)
+  const [realtimeLocations, setRealtimeLocations] = useState<Record<string, { lat: number; lng: number }>>({})
   
   const [viewState, setViewState] = useState({
     longitude: -63.1812,
@@ -87,6 +89,29 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
       })
     }
   }
+
+  // Escuchar actualizaciones en vivo de ubicaciones de reponedores
+  useEffect(() => {
+    const channel = supabase.channel('custom-all-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reponedor_locations' },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData && newData.reponedor_id && newData.latitude && newData.longitude) {
+            setRealtimeLocations(prev => ({
+              ...prev,
+              [newData.reponedor_id]: { lat: newData.latitude, lng: newData.longitude }
+            }));
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   useEffect(() => {
     if (selectedWorkerId) {
@@ -407,28 +432,7 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
               ))}
             </div>
             
-            <div className="bg-background/60 backdrop-blur-md border border-border rounded-full px-2 py-1.5 flex items-center gap-2 shadow-xl">
-               <button
-                 onClick={() => setIsPlaying(!isPlaying)}
-                 className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors text-primary"
-               >
-                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-               </button>
-               <div className="w-[1px] h-4 bg-border mx-1" />
-               <div className="flex gap-1 pr-2">
-                 {[1, 2, 5].map((mult) => (
-                   <button
-                     key={mult}
-                     onClick={() => setSpeedMultiplier(mult)}
-                     className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors ${
-                       speedMultiplier === mult ? 'bg-[#7b61ff] text-white' : 'text-muted-foreground hover:text-foreground'
-                     }`}
-                   >
-                     {mult}x
-                   </button>
-                 ))}
-               </div>
-            </div>
+
 
             {selectedWorker && (
                <div className="bg-background/60 backdrop-blur-md border border-border rounded-full px-3 py-1.5 flex items-center gap-2 shadow-xl hover:bg-background/80 transition-colors cursor-pointer" onClick={fitRouteBounds}>
@@ -536,7 +540,11 @@ export function LiveMap({ pdvs, reponedores, selectedWorkerId: propSelectedWorke
                   let lat = worker.lat
                   let lng = worker.lng
             
-                  if (totalCount > 1) {
+                  const realLoc = realtimeLocations[worker.dbUuid || worker.id]
+                  if (realLoc) {
+                    lat = realLoc.lat
+                    lng = realLoc.lng
+                  } else if (totalCount > 1) {
                     const visitedCount = Math.round((worker.routeProgress / 100) * totalCount)
                     const prevPdvId = sequence[Math.max(0, visitedCount - 1)]
                     const nextPdvId = sequence[Math.min(totalCount - 1, visitedCount)]

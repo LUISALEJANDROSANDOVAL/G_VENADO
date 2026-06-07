@@ -61,7 +61,7 @@ export function KPICards({ data, fleetCapacity = 83 }: KPICardsProps) {
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon
         return (
-          <Card key={index} className="border-border shadow-sm">
+          <Card key={index} className="border-white/20 dark:border-white/10 shadow-sm bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
             <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{kpi.label}</CardTitle>
               <div className={`${kpi.lightBg} p-1.5 rounded-lg shrink-0`}>

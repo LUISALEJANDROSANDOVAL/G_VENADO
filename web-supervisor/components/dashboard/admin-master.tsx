@@ -9,10 +9,11 @@ import type { PDV } from '@/lib/mock-data'
 interface AdminMasterProps {
   pdvs: PDV[]
   reponedores: any[]
+  photoEvidences?: any[]
   onRefresh?: () => void
 }
 
-export function AdminMaster({ pdvs, reponedores, onRefresh }: AdminMasterProps) {
+export function AdminMaster({ pdvs, reponedores, photoEvidences = [], onRefresh }: AdminMasterProps) {
   return (
     <div className="space-y-6 w-full mx-auto animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
@@ -43,7 +44,7 @@ export function AdminMaster({ pdvs, reponedores, onRefresh }: AdminMasterProps) 
         </TabsList>
         
         <TabsContent value="pdvs" className="animate-in fade-in duration-300">
-          <PDVsTab pdvs={pdvs} onRefresh={onRefresh} />
+          <PDVsTab pdvs={pdvs} photoEvidences={photoEvidences} onRefresh={onRefresh} />
         </TabsContent>
         
         <TabsContent value="workers" className="animate-in fade-in duration-300">

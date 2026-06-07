@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import type { RouteOptData } from '@/lib/mock-data'
 import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getRoutesPlanForDate, publishRoutesPlanForDate, addPdvToRoute, removePdvFromRoute } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
+import { DatePicker } from '@/components/ui/date-picker'
 import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -1401,19 +1402,13 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
               </p>
             </div>
             <div className="flex items-center gap-3 self-end sm:self-auto flex-wrap relative z-10">
-              <div className="flex items-center gap-2.5 bg-[#0B2545]/60 border border-slate-700/50 rounded-xl px-3.5 py-1.5 shadow-inner">
-                <span className="text-[10px] font-extrabold text-slate-300 uppercase tracking-wider">
-                  Auditar Fecha:
-                </span>
-                <input
-                  type="date"
-                  value={selectedHistoryDate}
-                  onChange={(e) => setSelectedHistoryDate(e.target.value)}
-                  max="2026-05-31"
-                  className="bg-[#0B2545]/80 border border-slate-600 rounded-lg text-xs px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white font-extrabold cursor-pointer transition-all"
-                />
-              </div>
-              <span className="px-3.5 py-1.5 rounded-full border text-[10px] font-extrabold bg-[#4EE39D]/10 text-[#4EE39D] border-[#4EE39D]/20 shadow-xs shrink-0 uppercase tracking-wide">
+              <DatePicker
+                label="Auditar Fecha:"
+                value={selectedHistoryDate}
+                onChange={setSelectedHistoryDate}
+                className="flex items-center gap-2.5 bg-[#0B2545]/60 border border-slate-600/50 hover:border-[#4EE39D]/50 transition-all duration-300 rounded-full px-4 py-2 shadow-inner group cursor-pointer"
+              />
+              <span className="px-4 py-2 rounded-full border text-[10px] font-extrabold bg-transparent text-[#4EE39D] border-[#4EE39D]/30 shadow-xs shrink-0 uppercase tracking-wide">
                 Solo Completadas
               </span>
             </div>
@@ -1510,16 +1505,16 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   </p>
                 </div>
                 <div className="flex items-center gap-3 self-end md:self-auto flex-wrap relative z-10">
-                  <div className="flex items-center gap-2.5 bg-[#0B2545]/60 border border-slate-700/50 rounded-xl px-3.5 py-1.5 shadow-inner">
-                    <input
-                      type="date"
-                      value={planningDateStr}
-                      onChange={(e) => setPlanningDateStr(e.target.value)}
-                      className="bg-[#0B2545]/80 border border-slate-650 rounded-lg text-xs px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-white font-extrabold cursor-pointer transition-all"
-                    />
-                  </div>
+                  <DatePicker
+                    label="Planificar para:"
+                    value={planningDateStr}
+                    onChange={setPlanningDateStr}
+                    minDate={new Date()}
+                    className="flex items-center gap-2.5 bg-[#0B2545]/60 border border-slate-600/50 hover:border-[#4EE39D]/50 transition-all duration-300 rounded-full px-4 py-2 shadow-inner group cursor-pointer"
+                  />
 
                   <Button
+                    className="rounded-full bg-[#10b981] hover:bg-[#059669] text-[#022c22] font-extrabold shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all px-6 py-4 h-auto text-[11px] tracking-wider uppercase"
                     disabled={isPublishingTomorrow || tomorrowPublished || !tomorrowPlans || tomorrowPlans.length === 0}
                     onClick={async () => {
                       if (tomorrowPublished || !tomorrowPlans) return

@@ -128,7 +128,7 @@ export function WorkersTab({ reponedores, onRefresh }: { reponedores: any[], onR
               </TableHeader>
               <TableBody>
                 {filteredWorkers.map((w) => (
-                  <TableRow key={w.id} className="border-border hover:bg-muted/30 transition-colors">
+                  <TableRow key={w.id} className="border-border group hover:bg-muted/30 hover:translate-x-1 transition-all duration-300 cursor-default">
                     <TableCell className="py-3.5">
                       <div className="flex flex-col">
                         <span className="font-semibold text-foreground text-sm">{w.name}</span>

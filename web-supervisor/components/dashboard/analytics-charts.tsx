@@ -31,7 +31,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const estimates: Record<string, number> = { Tránsito: 120, 'Carga/Descarga': 85, 'Gestión en PDV': 65 }
     return (
-      <div className="bg-card/95 backdrop-blur-sm border border-border shadow-xl rounded-xl p-3.5 flex flex-col gap-2.5 min-w-[240px] text-left animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl p-4 flex flex-col gap-2.5 min-w-[240px] text-left animate-in fade-in zoom-in-95 duration-200">
         <p className="font-bold text-xs text-foreground border-b border-border/80 pb-1.5 uppercase tracking-wide">
           Fase: {label}
         </p>
@@ -61,7 +61,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 const CustomLineTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card/95 backdrop-blur-sm border border-border shadow-xl rounded-xl p-3.5 flex flex-col gap-2 min-w-[180px] text-left animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl p-4 flex flex-col gap-2 min-w-[180px] text-left animate-in fade-in zoom-in-95 duration-200">
         <p className="font-bold text-xs text-foreground border-b border-border/80 pb-1.5 uppercase tracking-wide">
           Hora: {label}
         </p>
@@ -87,7 +87,7 @@ const CustomDonutTooltip = ({ active, payload }: any) => {
     const item = payload[0]
     const pct = ((item.value / TOTAL_REJECTIONS) * 100).toFixed(1)
     return (
-      <div className="bg-card/95 backdrop-blur-sm border border-border shadow-xl rounded-xl p-3 text-left animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl p-4 text-left animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center gap-2 mb-1">
           <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: item.payload.color }} />
           <span className="font-bold text-xs text-foreground">{item.name}</span>
@@ -109,7 +109,7 @@ const renderCustomizedLabel = (props: any, data: AnalyticsData) => {
   const total = (item as any).Tránsito + (item as any)['Carga/Descarga'] + (item as any)['Gestión en PDV']
     || item.Pareto + item.Mayorista + item.Detallista
   return (
-    <text x={x + width / 2} y={y - 8} fill="var(--foreground)" className="text-[10px] sm:text-[11px] font-bold opacity-80" textAnchor="middle">
+    <text x={x + width / 2} y={y - 8} fill="hsl(var(--foreground))" className="text-[10px] sm:text-[11px] font-bold opacity-80" textAnchor="middle">
       {total} min
     </text>
   )
@@ -251,25 +251,39 @@ export function AnalyticsCharts({ data, reponedores = [] }: AnalyticsChartsProps
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="microTask" stroke="var(--foreground)" tick={{ fontSize: 11 }} />
+              <BarChart data={barData} margin={{ top: 20 }}>
+                <defs>
+                  <linearGradient id="color1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity={0.7}/>
+                  </linearGradient>
+                  <linearGradient id="color2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0.7}/>
+                  </linearGradient>
+                  <linearGradient id="color3" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--chart-3))" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="hsl(var(--chart-3))" stopOpacity={0.7}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="microTask" stroke="hsl(var(--foreground))" tick={{ fontSize: 11 }} />
                 <YAxis
-                  stroke="var(--foreground)"
+                  stroke="hsl(var(--foreground))"
                   label={{
                     value: 'Minutos Promedio',
                     angle: -90,
                     position: 'insideLeft',
                     offset: 0,
-                    fill: 'var(--foreground)',
+                    fill: 'hsl(var(--foreground))',
                     style: { textAnchor: 'middle', fontWeight: '500' }
                   }}
                 />
                 <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                 <Legend />
-                <Bar dataKey="Tránsito"       stackId="a" fill="hsl(var(--chart-1))" />
-                <Bar dataKey="Carga/Descarga" stackId="a" fill="hsl(var(--chart-2))" />
-                <Bar dataKey="Gestión en PDV" stackId="a" fill="hsl(var(--chart-3))">
+                <Bar dataKey="Tránsito"       stackId="a" fill="url(#color1)" radius={[0, 0, 4, 4]} />
+                <Bar dataKey="Carga/Descarga" stackId="a" fill="url(#color2)" />
+                <Bar dataKey="Gestión en PDV" stackId="a" fill="url(#color3)" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="Gestión en PDV" content={(props: any) => renderCustomizedLabel(props, { ...data, effectiveMinutes: barData as any })} />
                 </Bar>
               </BarChart>
@@ -286,9 +300,9 @@ export function AnalyticsCharts({ data, reponedores = [] }: AnalyticsChartsProps
           <CardContent>
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={transformedRouteCompliance}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="time" stroke="var(--foreground)" />
-                <YAxis stroke="var(--foreground)" domain={[0, 100]} tickFormatter={val => `${val}%`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="time" stroke="hsl(var(--foreground))" />
+                <YAxis stroke="hsl(var(--foreground))" domain={[0, 100]} tickFormatter={val => `${val}%`} />
                 <ReferenceLine y={90} stroke="#10b981" strokeDasharray="4 4" strokeWidth={1.5}
                   label={{ value: 'Meta (90%)', position: 'top', fill: '#10b981', fontSize: 10, fontWeight: '700' }}
                 />

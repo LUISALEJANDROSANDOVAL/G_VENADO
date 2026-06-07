@@ -13,6 +13,7 @@ import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table, Globe }
 import { useToast } from '@/hooks/use-toast'
 import { Login } from '@/components/auth/login'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 
 const CITY_FILTERS: Record<string, { zonas: { nombre: string, supervisores: string[] }[] }> = {
   'Santa Cruz': {
@@ -44,8 +45,12 @@ const LiveMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="lg:col-span-3 flex items-center justify-center h-[460px] border border-border rounded-lg bg-slate-50">
-        <p className="text-muted-foreground">Cargando mapa de operaciones...</p>
+      <div className="lg:col-span-3 h-[460px] rounded-xl overflow-hidden relative bg-white/5 backdrop-blur-xl border border-white/10 dark:bg-slate-900/40">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+        <div className="absolute inset-0 flex flex-col p-6 animate-pulse">
+          <div className="w-1/3 h-8 bg-black/5 dark:bg-white/10 rounded-lg mb-4" />
+          <div className="flex-1 w-full bg-black/5 dark:bg-white/10 rounded-lg" />
+        </div>
       </div>
     )
   }
@@ -57,7 +62,7 @@ import {
   generateAnalyticsData,
   generateRouteOptData,
 } from '@/lib/mock-data'
-import { getDashboardData, seedDatabase } from '@/app/actions'
+import { getDashboardData, seedDatabase, fetchRealAnalytics } from '@/app/actions'
 import { supabase } from '@/lib/supabase'
 
 export default function ControlTowerDashboard() {
@@ -125,36 +130,11 @@ export default function ControlTowerDashboard() {
 
   const fetchDbAnalytics = async (startDate: string, endDate: string) => {
     try {
-      // 1. Fetch KPIs
-      const { data: kpiData, error: kpiErr } = await supabase.rpc('calcular_kpis_cobertura', {
-        fecha_inicio: startDate,
-        fecha_fin: endDate
-      })
-
-      // 2. Fetch minutes per task
-      const { data: minutesData, error: minutesErr } = await supabase.rpc('obtener_minutos_efectivos', {
-        fecha_inicio: startDate,
-        fecha_fin: endDate
-      })
-
-      // 3. Fetch route compliance timeline
-      const { data: complianceData, error: complianceErr } = await supabase.rpc('obtener_cumplimiento_rutas', {
-        fecha_inicio: startDate,
-        fecha_fin: endDate
-      })
-
-      if (kpiErr || minutesErr || complianceErr) {
-        console.error('Error fetching analytics from Supabase RPCs:', kpiErr || minutesErr || complianceErr)
-        return null
+      const res = await fetchRealAnalytics(startDate, endDate)
+      if (res && res.success && res.data) {
+        return res.data
       }
-
-      return {
-        kpis: kpiData && kpiData.length > 0 ? kpiData[0] : null,
-        analytics: {
-          effectiveMinutes: minutesData || [],
-          routeCompliance: complianceData || []
-        }
-      }
+      return null
     } catch (e) {
       console.error('Error in fetchDbAnalytics:', e)
       return null
@@ -574,19 +554,17 @@ export default function ControlTowerDashboard() {
                         </Select>
 
                         {selectedDateRange === 'Personalizado' && (
-                          <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 duration-200">
-                            <input
-                              type="date"
+                          <div className="flex items-center gap-3 bg-black/20 backdrop-blur-md border border-white/10 hover:border-emerald-500/50 transition-all duration-300 rounded-xl px-4 py-1.5 shadow-inner animate-in slide-in-from-right-2 duration-200">
+                            <DatePicker
                               value={customStartDate}
-                              onChange={(e) => setCustomStartDate(e.target.value)}
-                              className="bg-card border border-border rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
+                              onChange={setCustomStartDate}
+                              className="text-xs"
                             />
-                            <span className="text-xs text-muted-foreground font-semibold">a</span>
-                            <input
-                              type="date"
+                            <span className="text-xs text-muted-foreground font-bold px-1">a</span>
+                            <DatePicker
                               value={customEndDate}
-                              onChange={(e) => setCustomEndDate(e.target.value)}
-                              className="bg-card border border-border rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-foreground font-semibold cursor-pointer shadow-sm"
+                              onChange={setCustomEndDate}
+                              className="text-xs"
                             />
                           </div>
                         )}
@@ -756,7 +734,7 @@ export default function ControlTowerDashboard() {
                 {/* Admin Master Module */}
                 {activeModule === 'pdv' && (
                   <div className="space-y-3 animate-in fade-in">
-                    <AdminMaster pdvs={mockData.pdvs} reponedores={mockData.reponedores} onRefresh={loadData} />
+                    <AdminMaster pdvs={mockData.pdvs} reponedores={mockData.reponedores} photoEvidences={mockData.photoEvidences || []} onRefresh={loadData} />
                   </div>
                 )}
               </div>
