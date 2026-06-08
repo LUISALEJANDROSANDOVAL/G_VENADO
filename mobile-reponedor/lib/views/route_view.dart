@@ -17,6 +17,7 @@ import '../widgets/route_progress_header.dart';
 import '../widgets/route_summary_card.dart';
 import '../widgets/skeleton_pdv_card.dart';
 import 'login_view.dart';
+import 'main_shell.dart';
 import 'visit_execution_view.dart';
 
 /// Pantalla principal: ruta de jornada del reponedor.
@@ -366,7 +367,47 @@ class _RouteViewState extends State<RouteView> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        MapboxRouteMap(pdvs: _pdvs, activePdvId: active?.id),
+                        Stack(
+                          alignment: Alignment.topRight,
+                          children: [
+                            MapboxRouteMap(pdvs: _pdvs, activePdvId: active?.id),
+                            // Capa transparente que intercepta los toques
+                            Positioned.fill(
+                              child: GestureDetector(
+                                onTap: () {
+                                  MainShell.instance?.setTab(1);
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Text('Toca para ampliar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.traceRed)),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.open_in_full, size: 14, color: AppColors.traceRed),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 8),
                         _GpsTrackingHint(isActive: !_journeyComplete),
                         const SizedBox(height: 20),

@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/database_helper.dart';
 import 'services/app_connection_service.dart';
 import 'services/gps_service.dart';
@@ -76,31 +74,16 @@ class FieldOpsApp extends StatefulWidget {
 }
 
 class _FieldOpsAppState extends State<FieldOpsApp> {
-  StreamSubscription<AuthState>? _authSubscription;
-
   @override
   void initState() {
     super.initState();
-    // RF-06: Listener global de expiración/cierre de sesión.
-    try {
-      _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((data) {
-        final event = data.event;
-        if (event == AuthChangeEvent.signedOut) {
-          SessionService.instance.clearSession();
-          navigatorKey.currentState?.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginView()),
-            (route) => false,
-          );
-        }
-      });
-    } catch (e) {
-      debugPrint('No se pudo inicializar listener de AuthState: $e');
-    }
+    // Nota: No usamos onAuthStateChange de Supabase Auth nativo porque
+    // la autenticación se hace via RPC (verify_user_credentials) sobre
+    // la tabla public.users con BCrypt. La sesión se gestiona con SessionService.
   }
 
   @override
   void dispose() {
-    _authSubscription?.cancel();
     super.dispose();
   }
 
@@ -112,7 +95,7 @@ class _FieldOpsAppState extends State<FieldOpsApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: SessionService.instance.isLoggedIn
-          ? const MainShell()
+          ? MainShell(key: mainShellKey)
           : const LoginView(),
     );
   }

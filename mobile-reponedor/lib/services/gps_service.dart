@@ -1,8 +1,14 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'session_service.dart';
@@ -86,6 +92,8 @@ class GpsService {
   /// Handler que se ejecuta cuando el servicio de fondo arranca.
   @pragma('vm:entry-point')
   static void _onServiceStart(ServiceInstance service) async {
+    DartPluginRegistrant.ensureInitialized();
+    
     if (service is AndroidServiceInstance) {
       service.on('setAsForeground').listen((_) {
         service.setAsForegroundService();
@@ -99,7 +107,27 @@ class GpsService {
       service.stopSelf();
     });
 
-    // Timer periódico que corre dentro del servicio de fondo
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      // Si falla la carga del .env (ej. no existe), ignoramos.
+    }
+
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+    if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+      try {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseAnonKey,
+        );
+      } catch (e) {
+        // Ya inicializado u otro error
+      }
+    }
+
+    // Timer periódico que corre dentro del servicio de fondo (isolate separado)
     Timer.periodic(const Duration(seconds: _intervalSeconds), (_) async {
       if (service is AndroidServiceInstance) {
         if (await service.isForegroundService()) {
@@ -110,8 +138,33 @@ class GpsService {
         }
       }
 
-      // El rastreo real se maneja en la instancia principal
-      // El servicio solo mantiene vivo el proceso
+      try {
+        // Leer sesión directamente de SharedPreferences ya que SessionService no comparte memoria
+        final prefs = await SharedPreferences.getInstance();
+        final sessionJson = prefs.getString('user_session');
+        if (sessionJson == null) return;
+        
+        final map = jsonDecode(sessionJson) as Map<String, dynamic>;
+        final userId = map['id'] as String?;
+        if (userId == null) return;
+
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+
+        if (Supabase.instance.client != null) {
+          await Supabase.instance.client.from('reponedor_locations').upsert({
+            'reponedor_id': userId,
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        // Ignorar errores de red temporales
+      }
     });
   }
 
@@ -141,18 +194,21 @@ class GpsService {
       return;
     }
 
-    _isTracking = true;
+    // Pedir permiso de notificaciones para Android 13+ (necesario para Foreground Service)
+    if (Platform.isAndroid) {
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
 
-    // Activar el Foreground Service (notificación persistente en Android)
+    // Iniciar el Foreground Service
     if (!kIsWeb) {
       try {
-        final isRunning = await _backgroundService.isRunning();
-        if (!isRunning) {
-          await _backgroundService.startService();
-        }
+        await _backgroundService.startService();
       } catch (e) {
         // ignore: avoid_print
-        print('[GpsService] No se pudo iniciar Foreground Service: $e');
+        print('[GpsService] Error iniciando Background Service: $e');
       }
     }
 
@@ -160,7 +216,8 @@ class GpsService {
     // en el momento que inicia la sesión, sin esperar 30 segundos.
     await _captureAndUpload();
 
-    // Timer periódico cada 30 segundos
+    // Timer periódico cada 30 segundos en el hilo principal
+    // (respaldo por si el servicio de fondo falla o en iOS)
     _trackingTimer = Timer.periodic(
       const Duration(seconds: _intervalSeconds),
       (_) => _captureAndUpload(),

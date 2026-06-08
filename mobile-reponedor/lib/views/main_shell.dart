@@ -5,15 +5,25 @@ import 'map_fullscreen_view.dart';
 import 'history_view.dart';
 import 'profile_view.dart';
 
+final GlobalKey<MainShellState> mainShellKey = GlobalKey<MainShellState>();
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
+  static MainShellState? get instance => mainShellKey.currentState;
+
   @override
-  State<MainShell> createState() => _MainShellState();
+  State<MainShell> createState() => MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+
+  void setTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   final List<Widget> _pages = const [
     RouteView(),

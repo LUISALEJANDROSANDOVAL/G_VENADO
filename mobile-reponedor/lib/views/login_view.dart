@@ -9,7 +9,7 @@ import '../services/supabase_service.dart';
 import '../theme/trace_login_colors.dart';
 import '../widgets/connection_status_indicator.dart';
 import '../widgets/trace_logo.dart';
-import 'route_view.dart';
+import 'main_shell.dart';
 
 /// Pantalla de inicio de sesión — diseño premium TRACE V (inspirado en Tasker).
 class LoginView extends StatefulWidget {
@@ -118,24 +118,26 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
         ),
       );
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const RouteView()),
+        MaterialPageRoute<void>(builder: (_) => MainShell(key: mainShellKey)),
       );
       return;
     }
 
-    // Autenticación real con Supabase
+    // Autenticación real con Supabase (RPC verify_user_credentials)
     try {
-      final userRow = await SupabaseService.client
-          .from('users')
-          .select()
-          .eq('email', username)
-          .eq('password', password)
-          .maybeSingle();
+      final response = await SupabaseService.client.rpc(
+        'verify_user_credentials',
+        params: {
+          'p_email': username,
+          'p_password': password,
+        },
+      ) as List<dynamic>?;
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (userRow != null) {
+      if (response != null && response.isNotEmpty) {
+        final userRow = response.first as Map<String, dynamic>;
         final user = User.fromJson(userRow);
         await SessionService.instance.saveSession(user);
         if (!mounted) return;
@@ -148,7 +150,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
           ),
         );
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(builder: (_) => const RouteView()),
+          MaterialPageRoute<void>(builder: (_) => MainShell(key: mainShellKey)),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
