@@ -1,17 +1,24 @@
+<<<<<<< Updated upstream
 import 'dart:async';
+=======
+>>>>>>> Stashed changes
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../models/user.dart';
 import '../services/app_connection_service.dart';
-import '../services/gps_service.dart';
 import '../services/session_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/trace_login_colors.dart';
 import '../widgets/connection_status_indicator.dart';
+<<<<<<< Updated upstream
 import '../widgets/trace_logo.dart';
 import 'main_shell.dart';
 
 /// Pantalla de inicio de sesión — diseño premium TRACE V (inspirado en Tasker).
+=======
+import 'route_view.dart';
+
+>>>>>>> Stashed changes
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
 
@@ -19,12 +26,20 @@ class LoginView extends StatefulWidget {
   State<LoginView> createState() => _LoginViewState();
 }
 
+<<<<<<< Updated upstream
 class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
+=======
+class _LoginViewState extends State<LoginView>
+    with SingleTickerProviderStateMixin {
+>>>>>>> Stashed changes
   final _formKey = GlobalKey<FormState>();
-  final _userController = TextEditingController(text: MockData.mockUser.username);
-  final _passwordController = TextEditingController(text: 'demo1234');
-  bool _obscurePassword = true;
+  final _userController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  late AnimationController _animController;
+  late Animation<double> _scaleAnim;
 
   // Controladores de animación escalonada
   late AnimationController _entryController;
@@ -38,6 +53,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+<<<<<<< Updated upstream
     AppConnectionService.instance.addListener(_onConnectionChanged);
 
     _entryController = AnimationController(
@@ -77,14 +93,24 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
 
   void _onConnectionChanged() {
     if (mounted) setState(() {});
+=======
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96).animate(_animController);
+>>>>>>> Stashed changes
   }
 
   @override
   void dispose() {
-    AppConnectionService.instance.removeListener(_onConnectionChanged);
     _userController.dispose();
     _passwordController.dispose();
+<<<<<<< Updated upstream
     _entryController.dispose();
+=======
+    _animController.dispose();
+>>>>>>> Stashed changes
     super.dispose();
   }
 
@@ -98,10 +124,14 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
 
   Future<void> _onLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
-    final username = _userController.text.trim();
-    final password = _passwordController.text;
+<<<<<<< Updated upstream
+=======
 
+    _animController.forward().then((_) => _animController.reverse());
+>>>>>>> Stashed changes
+    setState(() => _isLoading = true);
+
+<<<<<<< Updated upstream
     // Modo demo offline
     if (username == MockData.mockUser.username && password == 'demo1234') {
       await Future<void>.delayed(const Duration(milliseconds: 700));
@@ -132,10 +162,17 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
           'p_password': password,
         },
       ) as List<dynamic>?;
+=======
+    try {
+      final identifier = _userController.text.trim();
+      final password = _passwordController.text;
+>>>>>>> Stashed changes
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (password.isEmpty) {
+        throw Exception('Ingresa tu contraseña para iniciar sesión.');
+      }
 
+<<<<<<< Updated upstream
       if (response != null && response.isNotEmpty) {
         final userRow = response.first as Map<String, dynamic>;
         final user = User.fromJson(userRow);
@@ -159,24 +196,111 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
             backgroundColor: TraceLoginColors.primary,
             behavior: SnackBarBehavior.floating,
           ),
+=======
+      final authEmail = await _resolveEmailForLogin(identifier);
+      if (authEmail == null) {
+        throw Exception(
+          'No se encontró un usuario con ese nombre, email o id. Usa tu email o id correcto.',
+>>>>>>> Stashed changes
         );
       }
-    } catch (e) {
+
+      final normalizedEmail = authEmail.trim().toLowerCase();
+      debugPrint('[LoginView] authEmail resuelto: $normalizedEmail');
+
+      dynamic authResponse;
+      try {
+        authResponse = await SupabaseService.client.auth.signInWithPassword(
+          email: normalizedEmail,
+          password: password,
+        );
+      } on supabase.AuthApiException catch (error) {
+        debugPrint('[LoginView] Supabase auth failed: ${error.message}');
+        final customUser = await _authenticateCustomUser(identifier, password);
+        if (customUser != null) {
+          await SessionService.instance.saveSession(customUser);
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RouteView()));
+          return;
+        }
+        rethrow;
+      }
+
+      final authUser = authResponse.user ?? SupabaseService.client.auth.currentUser;
+      if (authUser == null) {
+        final customUser = await _authenticateCustomUser(identifier, password);
+        if (customUser != null) {
+          await SessionService.instance.saveSession(customUser);
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RouteView()));
+          return;
+        }
+        throw Exception('No se pudo autenticar. Revisa tus credenciales.');
+      }
+
+      final profile = await SupabaseService.client
+          .from('users')
+          .select('id,name,email')
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+      if (profile == null) {
+        throw Exception('No se pudo cargar perfil de usuario.');
+      }
+
+      final Map<String, dynamic> profileMap = profile;
+
+      final emailValue = profileMap['email'];
+      final nameValue = profileMap['name'];
+
+      final user = User(
+        id: authUser.id,
+        name: nameValue is String && nameValue.isNotEmpty
+            ? nameValue
+            : _buildDisplayName(authEmail),
+        username: emailValue is String && emailValue.isNotEmpty
+            ? emailValue
+            : authEmail,
+      );
+
+      await SessionService.instance.saveSession(user);
+
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const RouteView()));
+    } catch (error) {
+      debugPrint('[LoginView] Error login: $error');
+      String message;
+      if (error is supabase.AuthApiException) {
+        message = error.message;
+      } else if (error is supabase.PostgrestException) {
+        message = error.message;
+      } else {
+        message = error.toString();
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+<<<<<<< Updated upstream
           content: Text('Error al conectar: $e'),
           backgroundColor: TraceLoginColors.primary,
           behavior: SnackBarBehavior.floating,
+=======
+          content: Text(message),
+>>>>>>> Stashed changes
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+<<<<<<< Updated upstream
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -423,6 +547,75 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
+=======
+      backgroundColor: TraceLoginColors.surface,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 450),
+              child: Column(
+                children: [
+                  Image.asset('assets/images/trace_v_logo1.png', width: 160),
+                  const SizedBox(height: 48),
+
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(32),
+                      border: Border.all(
+                        color: TraceLoginColors.primary.withValues(alpha: 0.1),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: TraceLoginColors.primary.withValues(
+                            alpha: 0.06,
+                          ),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          _buildField(
+                            'USUARIO',
+                            _userController,
+                            Icons.person_outline,
+                          ),
+                          const SizedBox(height: 24),
+                          _buildField(
+                            'CONTRASEÑA',
+                            _passwordController,
+                            Icons.lock_outline,
+                            isPass: true,
+                          ),
+                          const SizedBox(height: 24),
+                          ScaleTransition(
+                            scale: _scaleAnim,
+                            child: _buildLoginButton(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Usa tu nombre, Gmail o id de usuario y tu contraseña para iniciar sesión.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                  ),
+
+                  const SizedBox(height: 24),
+                  ConnectionStatusIndicator(
+                    status: AppConnectionService.instance.status,
+                  ),
+>>>>>>> Stashed changes
                 ],
               ),
             ),
@@ -432,6 +625,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
     );
   }
 
+<<<<<<< Updated upstream
   /// Campo en forma de pastilla (pill) — estilo Tasker con paleta TRACE V
   Widget _buildPillField({
     required String label,
@@ -443,10 +637,18 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
     TextInputAction? textInputAction,
     void Function(String)? onSubmitted,
     String? Function(String?)? validator,
+=======
+  Widget _buildField(
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    bool isPass = false,
+>>>>>>> Stashed changes
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+<<<<<<< Updated upstream
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
@@ -519,9 +721,180 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             ),
+=======
+        Text(
+          label == 'USUARIO' ? 'Usuario, gmail o id' : 'CONTRASEÑA',
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: TraceLoginColors.secondary,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: isPass && _obscurePassword,
+          keyboardType: label == 'USUARIO' ? TextInputType.emailAddress : TextInputType.text,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return label == 'USUARIO'
+                  ? 'Ingresa tu usuario, email o id'
+                  : 'Ingresa tu contraseña';
+            }
+            return null;
+          },
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: TraceLoginColors.primary),
+            suffixIcon: isPass
+                ? IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: TraceLoginColors.secondary,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  )
+                : null,
+            filled: true,
+            fillColor: TraceLoginColors.primaryLight,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(
+                color: TraceLoginColors.primary,
+                width: 2,
+              ),
+            ),
+>>>>>>> Stashed changes
           ),
         ),
       ],
     );
   }
+<<<<<<< Updated upstream
+=======
+
+  String _buildDisplayName(String raw) {
+    if (raw.isEmpty) return 'Reponedor';
+    if (raw.contains('@')) {
+      final parts = raw.split('@').first.split(RegExp('[._-]'));
+      return parts
+          .map(
+            (part) => part.isEmpty
+                ? ''
+                : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+          )
+          .join(' ');
+    }
+    return raw
+        .split(' ')
+        .map(
+          (part) => part.isEmpty
+              ? ''
+              : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
+  Future<Map<String, dynamic>?> _findUserProfileByLogin(
+    String identifier,
+  ) async {
+    if (identifier.isEmpty) return null;
+
+    final isEmail = RegExp(r'^\S+@\S+\.\S+$').hasMatch(identifier);
+    final isUuid = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(identifier);
+
+    final client = SupabaseService.client;
+
+    if (isEmail) {
+      final result = await client.from('users').select('id,name,email,password').ilike('email', identifier).maybeSingle();
+      if (result is Map<String, dynamic>) return result;
+      return null;
+    }
+
+    if (isUuid) {
+      final result = await client.from('users').select('id,name,email,password').eq('id', identifier).maybeSingle();
+      if (result is Map<String, dynamic>) return result;
+      return null;
+    }
+
+    // Name search: can return multiple rows. Use exact or first match if only one exists.
+    final results = await client.from('users').select('id,name,email,password').ilike('name', '%$identifier%').limit(5);
+    if (results.isNotEmpty) {
+      if (results.length == 1) {
+        return Map<String, dynamic>.from(results.first as Map);
+      }
+      throw Exception('Se encontraron varios usuarios con ese nombre. Usa tu email o id para iniciar sesión.');
+    }
+
+    return null;
+  }
+
+  Future<String?> _resolveEmailForLogin(String identifier) async {
+    if (identifier.isEmpty) return null;
+    final isEmail = RegExp(r'^\S+@\S+\.\S+$').hasMatch(identifier);
+    if (isEmail) return identifier.trim().toLowerCase();
+
+    final profile = await _findUserProfileByLogin(identifier);
+    return profile?['email'] as String?;
+  }
+
+  Future<User?> _authenticateCustomUser(String identifier, String password) async {
+    final profile = await _findUserProfileByLogin(identifier);
+    if (profile == null) return null;
+
+    final storedPassword = profile['password'];
+    if (storedPassword is String && storedPassword == password) {
+      final userId = profile['id']?.toString();
+      final email = profile['email']?.toString() ?? '';
+      final name = profile['name']?.toString() ?? _buildDisplayName(email);
+      if (userId == null || userId.isEmpty) return null;
+
+      return User(
+        id: userId,
+        name: name,
+        username: email.isNotEmpty ? email : identifier,
+      );
+    }
+
+    return null;
+  }
+
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _onLogin,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: TraceLoginColors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          elevation: 5,
+          shadowColor: TraceLoginColors.primary.withValues(alpha: 0.5),
+        ),
+        child: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text(
+                'INGRESAR',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  letterSpacing: 2,
+                ),
+              ),
+      ),
+    );
+  }
+>>>>>>> Stashed changes
 }

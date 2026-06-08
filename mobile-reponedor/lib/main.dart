@@ -1,3 +1,8 @@
+<<<<<<< Updated upstream
+=======
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb; // Importante para detectar Web
+>>>>>>> Stashed changes
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'data/database_helper.dart';
@@ -12,49 +17,48 @@ import 'views/main_shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Carga variables de entorno (.env real o .env.example como fallback)
+  // 1. Cargar variables de entorno
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
-    try {
-      await dotenv.load(fileName: '.env.example');
-    } catch (e2) {
-      debugPrint('Variables de entorno no cargadas: $e2');
-    }
+    debugPrint('Error cargando .env: $e');
   }
 
-  // Inicializar Supabase
+  // 2. Inicializar Supabase (Es necesario que las variables en .env no tengan prefijo)
   try {
     await SupabaseService.initialize();
+    debugPrint('[main] Supabase inicializado.');
   } catch (e) {
-    debugPrint('Supabase no inicializado: $e');
+    debugPrint('Error crítico en Supabase: $e');
   }
 
-  // ── Enterprise: Inicializar base de datos SQLite local ──
-  try {
-    await DatabaseHelper.instance.database;
-    debugPrint('[main] SQLite inicializado correctamente.');
-  } catch (e) {
-    debugPrint('[main] Error inicializando SQLite: $e');
+  // 3. Inicializar servicios NATIVOS (Solo si NO estamos en Web)
+  if (!kIsWeb) {
+    try {
+      await DatabaseHelper.instance.database;
+      debugPrint('[main] SQLite inicializado.');
+    } catch (e) {
+      debugPrint('[main] Error SQLite: $e');
+    }
+
+    try {
+      await AppConnectionService.initializeWorkmanager();
+      debugPrint('[main] Workmanager inicializado.');
+    } catch (e) {
+      debugPrint('[main] Error Workmanager: $e');
+    }
+
+    try {
+      await GpsService.initializeBackgroundService();
+      debugPrint('[main] GPS Background Service configurado.');
+    } catch (e) {
+      debugPrint('[main] Error GPS Service: $e');
+    }
+  } else {
+    debugPrint('[main] Modo Web detectado: Saltando inicialización de servicios nativos.');
   }
 
-  // ── Enterprise: Inicializar Workmanager (sync en segundo plano) ──
-  try {
-    await AppConnectionService.initializeWorkmanager();
-    debugPrint('[main] Workmanager inicializado correctamente.');
-  } catch (e) {
-    debugPrint('[main] Error inicializando Workmanager: $e');
-  }
-
-  // ── Enterprise: Configurar Foreground Service para GPS ──
-  try {
-    await GpsService.initializeBackgroundService();
-    debugPrint('[main] GPS Background Service configurado.');
-  } catch (e) {
-    debugPrint('[main] Error configurando GPS Background Service: $e');
-  }
-
-  // Inicializar sesión persistente
+  // 4. Inicializar sesión persistente
   try {
     await SessionService.instance.initSession();
   } catch (e) {
@@ -77,9 +81,23 @@ class _FieldOpsAppState extends State<FieldOpsApp> {
   @override
   void initState() {
     super.initState();
+<<<<<<< Updated upstream
     // Nota: No usamos onAuthStateChange de Supabase Auth nativo porque
     // la autenticación se hace via RPC (verify_user_credentials) sobre
     // la tabla public.users con BCrypt. La sesión se gestiona con SessionService.
+=======
+    // Escuchar cambios de autenticación
+    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedOut) {
+        SessionService.instance.clearSession();
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginView()),
+          (route) => false,
+        );
+      }
+    });
+>>>>>>> Stashed changes
   }
 
   @override
@@ -93,7 +111,7 @@ class _FieldOpsAppState extends State<FieldOpsApp> {
       navigatorKey: navigatorKey,
       title: 'TRACE V — Reponedores',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: SessionService.instance.isLoggedIn
           ? MainShell(key: mainShellKey)
           : const LoginView(),

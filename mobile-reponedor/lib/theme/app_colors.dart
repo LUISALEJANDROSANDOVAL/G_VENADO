@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 
-/// Paleta oficial Industrias Venado — adaptada al tema claro TRACE V
 class AppColors {
-  AppColors._();
+  static const Color institutionalBlue = Color(0xFF0056D2);
+  static const Color surface = Color(0xFFF8F9FA);
+  static const Color cardBackground = Colors.white;
+  // ── PALETA BASE (Los colores reales) ──────────────────────────
+  static const Color primary = Color(0xFFAA001B);
+  static const Color primaryAccent = Color(0xFFD11F2D);
+  static const Color border = Color(0xFFE5E5EA);
+  static const Color textPrimary = Color(0xFF1A1C1C);
+  static const Color textSecondary = Color(0xFF5E5E5E);
+  static const Color success = Color(0xFF00875A);
+  static const Color error = Color(0xFFF23036);
+  static const Color warning = Color(0xFFFFAB00);
+  static const Color whiteSurface = Color(0xFFFFFFFF);
+  static const Color lightBackground = Color(0xFFF4F5F6);
+  static const Color crimson = Color(0xFFDC143C);
 
+<<<<<<< Updated upstream
   // ── Rojos Corporativos TRACE V ───────────────────────────────────────────
   static const primaryRed = Color(0xFFAA001B);       // Rojo principal del login
   static const primaryRedAccent = Color(0xFFD11F2D); // Rojo brillante/activo
@@ -67,4 +81,24 @@ class AppColors {
   /// Errores y alertas críticas
   static const error = crimsonRed;
 }
+=======
+  // ── ALIAS NECESARIOS (Para que los archivos existentes no den error) ──
+>>>>>>> Stashed changes
 
+  static const Color activeBlue = primary;
+  static const Color wholesaleBlue = primary;
+  static const Color royalBlue = Color(0xFF4169E1);
+  static const Color steelBlue = Color(0xFF4682B4);
+  static const Color cornflowerBlue = Color(0xFF6495ED);
+  static const Color darkTurquoise = Color(0xFF00CED1);
+  static const Color paretoRed = error;
+  static const Color detallistaGray = textSecondary;
+  static const Color dimGray = Color(0xFF696969);
+  static const Color darkBackground = Color(0xFF1C1C1E);
+  static const Color snow = Color(0xFFFFFFFF);
+  
+  static const Color inputBorder = border;
+  static const Color secondaryText = textSecondary;
+  static const Color primaryText = textPrimary;
+  static const Color dimGrayBorder = border;
+}

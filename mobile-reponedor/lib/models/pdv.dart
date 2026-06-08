@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'enums.dart';
 
 /// Punto de venta asignado en la ruta diaria.
@@ -54,9 +56,11 @@ class Pdv {
       _ => VisitStatus.pendiente,
     };
 
-    // Coordenadas: pueden venir como double o como PostGIS geometry JSON
+    // Coordenadas: pueden venir como double, lat/lng, o como geometría PostGIS.
     final lat = _parseDouble(json['latitude'] ?? json['lat']);
     final lng = _parseDouble(json['longitude'] ?? json['lng']);
+    final geomCoords = _parseGeom(json['geom'] ?? json['geometry']);
+    final hasValidGeom = geomCoords != null && _isValidLatitude(geomCoords[0]) && _isValidLongitude(geomCoords[1]);
 
     return Pdv(
       id: json['id']?.toString() ?? '',
@@ -69,18 +73,77 @@ class Pdv {
       status: status,
       mapX: _parseDouble(json['map_x']),
       mapY: _parseDouble(json['map_y']),
-      latitude: lat,
-      longitude: lng,
+      latitude: lat ?? (hasValidGeom ? geomCoords[0] : null),
+      longitude: lng ?? (hasValidGeom ? geomCoords[1] : null),
     );
   }
 
   static double? _parseDouble(dynamic value) {
     if (value == null) return null;
-    if (value is double) return value;
+    if (value is double) return value.isFinite ? value : null;
     if (value is int) return value.toDouble();
+<<<<<<< Updated upstream
     if (value is num) return value.toDouble(); // PostgreSQL numeric/decimal
     if (value is String) return double.tryParse(value);
+=======
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      return (parsed != null && parsed.isFinite) ? parsed : null;
+    }
+>>>>>>> Stashed changes
     return null;
+  }
+
+  static bool _isValidLatitude(double? latitude) {
+    return latitude != null && latitude.isFinite && latitude >= -90 && latitude <= 90;
+  }
+
+  static bool _isValidLongitude(double? longitude) {
+    return longitude != null && longitude.isFinite && longitude >= -180 && longitude <= 180;
+  }
+
+  static List<double>? _parseGeom(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final text = value.trim();
+      if (text.isEmpty) return null;
+      if (text.startsWith('0101') || text.startsWith('0001')) {
+        try {
+          final bytes = _hexToBytes(text);
+          final byteData = ByteData.sublistView(bytes);
+          final littleEndian = bytes[0] == 1;
+          final endian = littleEndian ? Endian.little : Endian.big;
+          var offset = 1;
+          final type = byteData.getUint32(offset, endian);
+          offset += 4;
+          final hasSrid = type & 0x20000000 != 0;
+          if (hasSrid) {
+            offset += 4;
+          }
+          final x = byteData.getFloat64(offset, endian);
+          final y = byteData.getFloat64(offset + 8, endian);
+          return [y, x];
+        } catch (_) {
+          return null;
+        }
+      }
+      if (text.toUpperCase().startsWith('SRID=')) {
+        final parts = text.split(';');
+        if (parts.length == 2) {
+          return _parseGeom(parts[1]);
+        }
+      }
+    }
+    return null;
+  }
+
+  static Uint8List _hexToBytes(String hex) {
+    final normalized = hex.replaceAll(' ', '').toLowerCase();
+    final bytes = Uint8List(normalized.length ~/ 2);
+    for (var i = 0; i < normalized.length; i += 2) {
+      bytes[i ~/ 2] = int.parse(normalized.substring(i, i + 2), radix: 16);
+    }
+    return bytes;
   }
 
   Pdv copyWith({VisitStatus? status}) {

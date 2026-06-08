@@ -17,7 +17,12 @@ import '../widgets/route_progress_header.dart';
 import '../widgets/route_summary_card.dart';
 import '../widgets/skeleton_pdv_card.dart';
 import 'login_view.dart';
+<<<<<<< Updated upstream
 import 'main_shell.dart';
+=======
+import 'profile_view.dart';
+import 'route_history_view.dart';
+>>>>>>> Stashed changes
 import 'visit_execution_view.dart';
 
 /// Pantalla principal: ruta de jornada del reponedor.
@@ -96,6 +101,19 @@ class _RouteViewState extends State<RouteView> {
 
   Pdv? get _activePdv => MockData.nextPendingPdv(_pdvs);
 
+  String get _greetingName {
+    final name = SessionService.instance.currentUserName;
+    if (name == null || name.isEmpty) return 'Reponedor';
+    return name.split(' ').first;
+  }
+
+  String get _userInitials {
+    final name = SessionService.instance.currentUserName ?? 'R';
+    final parts = name.split(' ');
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
   Future<void> _refreshRoute() async {
     setState(() => _isRefreshing = true);
     // Invalida caché para forzar recarga desde Supabase
@@ -129,7 +147,24 @@ class _RouteViewState extends State<RouteView> {
     );
   }
 
+<<<<<<< Updated upstream
   void _openNavigation(Pdv target) {
+=======
+  void _openProfile() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const ProfileView()),
+    );
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const RouteHistoryView()),
+    );
+  }
+
+  void _openNavigation() {
+    final target = _activePdv;
+>>>>>>> Stashed changes
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.cardBackground,
@@ -274,6 +309,7 @@ class _RouteViewState extends State<RouteView> {
     final active = _activePdv;
 
     return Scaffold(
+<<<<<<< Updated upstream
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
         child: Container(
@@ -300,6 +336,54 @@ class _RouteViewState extends State<RouteView> {
                 tooltip: 'Cerrar sesión',
                 onPressed: _logout,
               ),
+=======
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        centerTitle: false,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Hola, $_greetingName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text('Tu ruta diaria', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Sincronizar',
+            onPressed: () => AppConnectionService.instance.manualSync(),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Perfil y menú',
+            icon: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.whiteSurface,
+              child: Text(
+                _userInitials,
+                style: const TextStyle(color: AppColors.primaryText, fontWeight: FontWeight.bold),
+              ),
+            ),
+            onSelected: (value) {
+              switch (value) {
+                case 'profile':
+                  _openProfile();
+                  break;
+                case 'history':
+                  _openHistory();
+                  break;
+                case 'logout':
+                  _logout();
+                  break;
+                default:
+                  break;
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'profile', child: ListTile(leading: Icon(Icons.person), title: Text('Mi perfil'))),
+              PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Historial de rutas'))),
+              PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('Cerrar sesión'))),
+>>>>>>> Stashed changes
             ],
           ),
         ),
@@ -309,9 +393,9 @@ class _RouteViewState extends State<RouteView> {
           const OfflineBanner(),
           // Banner informativo si los datos vienen del modo demo
           if (_loadError != null && !_isLoadingRoute)
-            _SourceBanner(isDemo: true, message: 'Modo Demo — Supabase sin ruta asignada hoy'),
+            const _SourceBanner(isDemo: true, message: 'Modo Demo — Supabase sin ruta asignada hoy'),
           if (_loadError == null && !_isLoadingRoute && _pdvs.isNotEmpty)
-            _SourceBanner(isDemo: false, message: 'Ruta cargada desde Supabase ✓'),
+            const _SourceBanner(isDemo: false, message: 'Ruta cargada desde Supabase ✓'),
           Expanded(
             child: _isLoadingRoute
                 ? ListView(
@@ -332,12 +416,44 @@ class _RouteViewState extends State<RouteView> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       children: [
-                        RouteProgressHeader(
-                          reponedorName: SessionService.instance.currentUserName ?? 'Reponedor',
-                          dateLabel: _dateLabel,
-                          completedVisits: _completed,
-                          totalVisits: _pdvs.length,
+                        _buildSectionHeader('Resumen de la jornada', 'Controla tu avance y los próximos pasos.'),
+                  const SizedBox(height: 14),
+                  RouteProgressHeader(
+                    reponedorName: SessionService.instance.currentUserName ?? 'Reponedor',
+                    dateLabel: _dateLabel,
+                    completedVisits: _completed,
+                    totalVisits: _pdvs.length,
+                  ),
+                  const SizedBox(height: 18),
+                  if (active != null && !_journeyComplete) ...[
+                    _buildFocusCard(context, active),
+                    const SizedBox(height: 18),
+                  ],
+                  RouteSummaryRow(
+                    pending: _pending,
+                    completed: _completed,
+                    pendingSync: _pendingSync,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStatusSummary(context),
+                  if (_journeyComplete) ...[
+                    const SizedBox(height: 16),
+                    _JourneyCompleteCard(total: _pdvs.length),
+                  ],
+                  const SizedBox(height: 20),
+                  _buildSectionHeader('Mapa de la ruta', 'Sigue el recorrido actual desde el mapa.'),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text('Vista interactiva', style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      if (_isRefreshing)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
+<<<<<<< Updated upstream
                         const SizedBox(height: 20),
                         RouteSummaryRow(
                           pending: _pending,
@@ -414,6 +530,18 @@ class _RouteViewState extends State<RouteView> {
                         Text('Puntos de venta', style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 10),
                         ...List.generate(_pdvs.length, (index) {
+=======
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  MapboxRouteMap(pdvs: _pdvs, activePdvId: active?.id),
+                  const SizedBox(height: 8),
+                  _GpsTrackingHint(isActive: !_journeyComplete),
+                  const SizedBox(height: 20),
+                  _buildSectionHeader('Puntos de venta', 'Inicia cada ruta con un toque en el botón.'),
+                  const SizedBox(height: 10),
+                  ...List.generate(_pdvs.length, (index) {
+>>>>>>> Stashed changes
                           final pdv = _pdvs[index];
                           // Staggered delay (simulado con curvo y duration ligeramente más largos para elementos posteriores)
                           return TweenAnimationBuilder<double>(
@@ -430,9 +558,16 @@ class _RouteViewState extends State<RouteView> {
                               );
                             },
                             child: PdvCard(
+<<<<<<< Updated upstream
                               pdv: pdv, 
                               onTap: () => _openVisit(pdv),
                               onNavigateTap: pdv.status == VisitStatus.enProceso ? () => _openNavigation(pdv) : null,
+=======
+                              pdv: pdv,
+                              onTap: pdv.status == VisitStatus.completada ? null : () => _openVisit(pdv),
+                              actionLabel: pdv.status == VisitStatus.completada ? 'Ruta terminada' : 'Iniciar ruta',
+                              onActionPressed: pdv.status == VisitStatus.completada ? null : () => _openVisit(pdv),
+>>>>>>> Stashed changes
                             ),
                           );
                         }),
@@ -441,6 +576,175 @@ class _RouteViewState extends State<RouteView> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+<<<<<<< Updated upstream
+=======
+
+  Widget _buildStatusSummary(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _StatusChip(label: 'Pendientes', value: '$_pending', color: AppColors.warning.withValues(alpha: 0.14), icon: Icons.schedule),
+        _StatusChip(label: 'Completadas', value: '$_completed', color: AppColors.success.withValues(alpha: 0.14), icon: Icons.check_circle),
+        _StatusChip(label: 'Sincronizar', value: '$_pendingSync', color: AppColors.institutionalBlue.withValues(alpha: 0.14), icon: Icons.cloud_upload),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.secondaryText)),
+      ],
+    );
+  }
+
+  Widget _buildFocusCard(BuildContext context, Pdv pdv) {
+    return Card(
+      color: AppColors.institutionalBlue.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.rocket_launch, color: AppColors.institutionalBlue),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Siguiente ruta',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(pdv.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(pdv.address, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.secondaryText)),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _FocusBadge(icon: Icons.location_on, label: '${pdv.distanceKm.toStringAsFixed(1)} km'),
+                const SizedBox(width: 10),
+                _FocusBadge(icon: Icons.access_time, label: pdv.estimatedTime),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _openVisit(pdv),
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Iniciar ruta'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomAction(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: AppColors.cardBackground,
+        border: Border(top: BorderSide(color: AppColors.inputBorder)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: _activePdv != null ? _openNavigation : null,
+            icon: const Icon(Icons.navigation),
+            label: const Text('Abrir Navegación'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+>>>>>>> Stashed changes
+}
+
+class _FocusBadge extends StatelessWidget {
+  const _FocusBadge({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.whiteSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.institutionalBlue),
+          const SizedBox(width: 8),
+          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.value, required this.color, required this.icon});
+
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color.computeLuminance() > 0.5 ? Colors.black87 : Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(value, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -478,68 +782,6 @@ class _JourneyCompleteCard extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActivePdvBanner extends StatelessWidget {
-  const _ActivePdvBanner({required this.pdv, required this.onOpen});
-
-  final Pdv pdv;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.institutionalBlue.withValues(alpha: 0.06),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.institutionalBlue, width: 1.5),
-      ),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: AppColors.institutionalBlue,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '${pdv.visitNumber}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Siguiente visita'.toUpperCase(),
-                      style: TextStyle(
-                            fontSize: 10,
-                            color: AppColors.institutionalBlue,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(pdv.name, style: Theme.of(context).textTheme.titleMedium),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward, color: AppColors.institutionalBlue),
-            ],
-          ),
         ),
       ),
     );
@@ -618,26 +860,22 @@ class _SourceBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: isDemo
-          ? const Color(0xFFFFF3CD) // Amarillo suave demo
-          : const Color(0xFFD4EDDA), // Verde suave Supabase
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: isDemo ? Colors.orange.shade50 : Colors.green.shade50,
       child: Row(
         children: [
           Icon(
-            isDemo ? Icons.info_outline : Icons.cloud_done_outlined,
-            size: 16,
-            color: isDemo ? const Color(0xFF856404) : const Color(0xFF155724),
+            isDemo ? Icons.cloud_off : Icons.cloud_done,
+            size: 14,
+            color: isDemo ? Colors.orange.shade800 : Colors.green.shade800,
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDemo ? const Color(0xFF856404) : const Color(0xFF155724),
-              ),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDemo ? Colors.orange.shade800 : Colors.green.shade800,
             ),
           ),
         ],

@@ -7,6 +7,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:latlong2/latlong.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/evidence.dart';
@@ -20,6 +21,7 @@ import '../theme/app_colors.dart';
 import '../widgets/customer_type_badge.dart';
 import '../widgets/evidence_gallery.dart';
 import '../widgets/geofence_status_chip.dart';
+import '../widgets/mapbox_route_map.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/sync_status_card.dart';
 import '../widgets/task_checklist_item.dart';
@@ -554,6 +556,10 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
                   hasPdvCoordinates: _visit.pdv.latitude != null && _visit.pdv.longitude != null,
                 ),
                 const SizedBox(height: 20),
+                if (_visit.pdv.latitude != null && _visit.pdv.longitude != null) ...[
+                  _buildRouteGuide(context),
+                  const SizedBox(height: 20),
+                ],
                 Text(
                   MockData.checklistLabel(_visit.pdv.customerType),
                   style: Theme.of(context).textTheme.titleMedium,
@@ -772,6 +778,29 @@ class _VisitExecutionViewState extends State<VisitExecutionView> {
           estimatedSeconds: _parseEstimatedSeconds(_visit.pdv.estimatedTime),
         ),
       ),
+    );
+  }
+
+  Widget _buildRouteGuide(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Guía de ruta',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Visualiza tu ruta óptima hacia el PDV activo y los próximos puntos programados.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.secondaryText),
+        ),
+        const SizedBox(height: 12),
+        MapboxRouteMap(
+          pdvs: widget.allPdvs,
+          activePdvId: _visit.pdv.id,
+          initialCenter: LatLng(_visit.pdv.latitude!, _visit.pdv.longitude!),
+        ),
+      ],
     );
   }
 

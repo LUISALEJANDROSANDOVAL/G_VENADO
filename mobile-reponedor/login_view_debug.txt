@@ -1,0 +1,51 @@
+﻿40:     if (!_formKey.currentState!.validate()) return;
+41: 
+42:     _animController.forward().then((_) => _animController.reverse());
+43:     setState(() => _isLoading = true);
+44: 
+45:     try {
+46:       final identifier = _userController.text.trim();
+47:       final profile = await _findUserProfileByLogin(identifier);
+48: 
+49:       if (profile == null) {
+50:         throw Exception('No se encontrÃ³ un usuario con ese nombre, email o id.');
+51:       }
+52: 
+53:       final user = User(
+54:         id: profile['id'] as String,
+55:         name: profile['name'] as String? ?? _buildDisplayName(identifier),
+56:         username: profile['email'] as String? ?? identifier,
+57:       );
+58: 
+59:       await SessionService.instance.saveSession(user);
+60: 
+61:       if (!mounted) return;
+62:       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RouteView()));
+63:     } catch (error) {
+64:       debugPrint('[LoginView] Error login: $error');
+65:       if (!mounted) return;
+66:       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+67:         content: Text(error is supabase.PostgrestException ? error.message : error.toString()),
+68:       ));
+69:     } finally {
+70:       if (mounted) setState(() => _isLoading = false);
+71:     }
+72:   }
+73: 
+74:   @override
+75:   Widget build(BuildContext context) {
+76:     return Scaffold(
+77:       backgroundColor: TraceLoginColors.surface,
+78:       body: SafeArea(
+79:         child: Center(
+80:           child: SingleChildScrollView(
+81:             padding: const EdgeInsets.symmetric(horizontal: 24),
+82:             child: ConstrainedBox(
+83:               constraints: const BoxConstraints(maxWidth: 450),
+84:               child: Column(
+85:                 children: [
+86:                   Image.asset('assets/images/trace_v_logo1.png', width: 160),
+87:                   const SizedBox(height: 48),
+88: 
+89:                   Container(
+90:                     padding: const EdgeInsets.all(32),

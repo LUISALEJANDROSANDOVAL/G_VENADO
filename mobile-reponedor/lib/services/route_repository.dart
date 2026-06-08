@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/mock_data.dart';
 import '../models/enums.dart';
 import '../models/pdv.dart';
+import '../models/route_history_item.dart';
 import '../models/task.dart';
 import 'app_connection_service.dart';
 import 'offline_sync_service.dart';
@@ -62,7 +64,18 @@ class RouteRepository {
         planQuery = planQuery.eq('reponedor_id', userId);
       }
 
-      final plans = await planQuery;
+      var plans = await planQuery;
+      if (plans.isEmpty && userId != null && userId.isNotEmpty) {
+        // Si no hay ruta para hoy, buscar el último plan disponible del usuario.
+        // Esto evita mostrar una ruta vacía cuando el servidor no ha creado un plan hoy.
+        plans = await client
+            .from('daily_routes_plan')
+            .select()
+            .eq('reponedor_id', userId)
+            .order('date', ascending: false)
+            .limit(1);
+      }
+
       if (plans.isEmpty) {
         return _fallback(reason: 'Sin plan de ruta asignado para hoy en Supabase');
       }
@@ -70,12 +83,15 @@ class RouteRepository {
       final plan = plans.first;
       final planId = plan['id']?.toString();
       final sequenceRaw = plan['optimized_pos_sequence'];
-      
-      if (sequenceRaw == null || sequenceRaw is! List || sequenceRaw.isEmpty) {
+      final sequence = _parseSequence(sequenceRaw);
+
+      if (sequence == null || sequence.isEmpty) {
+        final allPdvs = await _loadAllPointsOfSale(client);
+        if (allPdvs.isNotEmpty) {
+          return _buildPdvsFromRows(allPdvs, planId: planId, userId: userId);
+        }
         return _fallback(reason: 'El plan de hoy no tiene secuencia de PDVs');
       }
-
-      final sequence = sequenceRaw.map((e) => e.toString()).toList();
 
       // ── 2. Consultar los PDVs detallados en base a la secuencia ────────────
       final pdvRows = await client
@@ -106,7 +122,7 @@ class RouteRepository {
         final logs = await client
             .from('task_logs')
             .select('pos_id')
-            .eq('route_plan_id', planId);
+            .filter('route_plan_id', 'eq', planId);
         visitedPdvIds = logs.map((l) => l['pos_id'].toString()).toSet();
       }
 
@@ -132,12 +148,70 @@ class RouteRepository {
   /// Filtra en base al tipo de cliente de forma dinámica.
   ///
   /// Fallback: genera las tareas desde [MockData.tasksForCustomerType].
+  Future<List<RouteHistoryItem>> fetchRouteHistory({String? userId, int limit = 7}) async {
+    try {
+      final client = SupabaseService.client;
+      var planQuery = client
+          .from('daily_routes_plan')
+          .select()
+          .order('date', ascending: false)
+          .limit(limit);
+
+      if (userId != null && userId.isNotEmpty) {
+        planQuery = planQuery.filter('reponedor_id', 'eq', userId);
+      }
+
+      final plans = await planQuery;
+      if ((plans as List).isEmpty) {
+        return [];
+      }
+
+      final planIds = plans.map((row) => row['id']?.toString()).whereType<String>().toList();
+      final logs = await client
+          .from('task_logs')
+          .select('route_plan_id,pos_id')
+          .inFilter('route_plan_id', planIds);
+
+      final visitedByPlan = <String, Set<String>>{};
+      for (final row in (logs as List)) {
+        final planId = row['route_plan_id']?.toString();
+        final posId = row['pos_id']?.toString();
+        if (planId == null || posId == null) continue;
+        visitedByPlan.putIfAbsent(planId, () => <String>{}).add(posId);
+      }
+
+      return plans.map<RouteHistoryItem>((row) {
+        final planId = row['id']?.toString() ?? 'unknown';
+        final dateRaw = row['date']?.toString() ?? '';
+        final date = DateTime.tryParse(dateRaw) ?? DateTime.now();
+        final sequenceRaw = row['optimized_pos_sequence'];
+        final sequence = _parseSequence(sequenceRaw);
+        final totalStops = sequence?.length ?? 0;
+        final completedStops = visitedByPlan[planId]?.length ?? 0;
+        final statusString = row['status']?.toString().toUpperCase() ?? '';
+        final status = statusString == 'COMPLETADA' || completedStops >= totalStops && totalStops > 0
+            ? 'Completada'
+            : 'En proceso';
+
+        return RouteHistoryItem(
+          planId: planId,
+          date: date,
+          totalStops: totalStops,
+          completedStops: completedStops,
+          status: status,
+        );
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<List<Task>> fetchTasksForPdv(String pdvId, CustomerType customerType) async {
     try {
       final rows = await SupabaseService.client
           .from('micro_tasks')
           .select()
-          .eq('is_active', true);
+          .filter('is_active', 'eq', true);
 
       if ((rows as List).isEmpty) {
         return MockData.tasksForCustomerType(customerType);
@@ -283,7 +357,7 @@ class RouteRepository {
       await SupabaseService.client
           .from('daily_routes_plan')
           .update({'status': status})
-          .eq('id', planId);
+          .filter('id', 'eq', planId);
     } catch (e) {
       // ignore: avoid_print
       print('[RouteRepository] Error actualizando estado de la ruta: $e');
@@ -295,6 +369,60 @@ class RouteRepository {
     _cachedRoute = null;
     _cachedUserId = null;
     _cachedRoutePlanId = null;
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAllPointsOfSale(SupabaseClient client) async {
+    final rows = await client.from('points_of_sale').select();
+    return (rows as List).cast<Map<String, dynamic>>();
+  }
+
+  List<String>? _parseSequence(dynamic sequenceRaw) {
+    if (sequenceRaw == null) return null;
+    if (sequenceRaw is List) {
+      return sequenceRaw.map((e) => e.toString()).toList();
+    }
+    if (sequenceRaw is String) {
+      final trimmed = sequenceRaw.trim();
+      if (trimmed.isEmpty) return null;
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is List) {
+            return decoded.map((e) => e.toString()).toList();
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        final inside = trimmed.substring(1, trimmed.length - 1);
+        final parts = inside
+            .split(',')
+            .map((part) => part.trim())
+            .where((part) => part.isNotEmpty)
+            .toList();
+        return parts.map((part) => part.replaceAll(RegExp(r'^"|"$'), '')).toList();
+      }
+      return trimmed
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    return null;
+  }
+
+  List<Pdv> _buildPdvsFromRows(List<Map<String, dynamic>> rows, {String? planId, String? userId}) {
+    final pdvs = rows.asMap().entries.map((e) {
+      final row = Map<String, dynamic>.from(e.value);
+      row['status'] = 'pendiente';
+      return Pdv.fromJson(row, visitNumber: e.key + 1);
+    }).toList();
+
+    _cachedRoute = pdvs;
+    _cachedUserId = userId;
+    _cachedRoutePlanId = planId;
+    return pdvs;
   }
 
   // ── Helpers privados ──────────────────────────────────────────────────────

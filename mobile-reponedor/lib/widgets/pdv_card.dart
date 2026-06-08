@@ -11,12 +11,22 @@ class PdvCard extends StatelessWidget {
     super.key,
     required this.pdv,
     this.onTap,
+<<<<<<< Updated upstream
     this.onNavigateTap,
+=======
+    this.actionLabel,
+    this.onActionPressed,
+>>>>>>> Stashed changes
   });
 
   final Pdv pdv;
   final VoidCallback? onTap;
+<<<<<<< Updated upstream
   final VoidCallback? onNavigateTap;
+=======
+  final String? actionLabel;
+  final VoidCallback? onActionPressed;
+>>>>>>> Stashed changes
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +48,16 @@ class PdvCard extends StatelessWidget {
       bgColor = AppColors.success.withValues(alpha: 0.03);
     }
 
+    final borderColor = pdv.status == VisitStatus.completada
+        ? AppColors.success
+        : pdv.status == VisitStatus.enProceso
+            ? AppColors.warning
+            : AppColors.inputBorder;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
+<<<<<<< Updated upstream
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: isActive ? 1.5 : 1),
@@ -51,6 +68,23 @@ class PdvCard extends StatelessWidget {
               blurRadius: elevation,
               offset: const Offset(0, 4),
             ),
+=======
+        color: pdv.status == VisitStatus.completada
+            ? AppColors.success.withValues(alpha: 0.08)
+            : AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: borderColor,
+          width: isActive ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: borderColor.withValues(alpha: isActive ? 0.18 : 0.08),
+            blurRadius: isActive ? 14 : 6,
+            offset: const Offset(0, 3),
+            spreadRadius: isActive ? 2 : 0,
+          ),
+>>>>>>> Stashed changes
         ],
       ),
       child: Material(
@@ -64,6 +98,7 @@ class PdvCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+<<<<<<< Updated upstream
               Hero(
                 tag: 'pdv-number-${pdv.id}',
                 child: Material(
@@ -182,11 +217,91 @@ class PdvCard extends StatelessWidget {
                   const Icon(Icons.chevron_right, color: AppColors.secondaryText),
                 if (isCompleted)
                   const Icon(Icons.check_circle, color: AppColors.success),
+=======
+                _VisitNumberBadge(number: pdv.visitNumber, isActive: isActive),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              pdv.name,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          CustomerTypeBadge(type: pdv.customerType),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              size: 14, color: AppColors.secondaryText),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              pdv.address,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time,
+                              size: 14, color: AppColors.secondaryText),
+                          const SizedBox(width: 4),
+                          Text(
+                            pdv.estimatedTime,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 16),
+                          const Icon(Icons.straighten,
+                              size: 14, color: AppColors.secondaryText),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${pdv.distanceKm.toStringAsFixed(1)} km',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      VisitStatusBadge(status: pdv.status),
+                      if (actionLabel != null) ...[
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: onActionPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: onActionPressed != null
+                                  ? AppColors.institutionalBlue
+                                  : AppColors.secondaryText.withValues(alpha: 0.16),
+                              foregroundColor: onActionPressed != null ? Colors.white : AppColors.secondaryText,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              elevation: 0,
+                            ),
+                            child: Text(actionLabel!),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  const Icon(Icons.chevron_right, color: AppColors.secondaryText),
+>>>>>>> Stashed changes
               ],
             ),
           ),
         ),
       ),
+<<<<<<< Updated upstream
     );
   }
 }
@@ -230,6 +345,8 @@ class _PulseLabelState extends State<_PulseLabel> with SingleTickerProviderState
           letterSpacing: 0.5,
         ),
       ),
+=======
+>>>>>>> Stashed changes
     );
   }
 }
