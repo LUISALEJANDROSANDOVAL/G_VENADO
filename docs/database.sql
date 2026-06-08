@@ -15,9 +15,10 @@ CREATE TABLE public.users (
   email character varying NOT NULL UNIQUE,
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  password text,
   departamento text,
   role_id smallint,
+  role text,
+  password text,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.role(id)
 );

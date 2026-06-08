@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Sliders, MapPin, Play, RefreshCw, Compass, Tag, Store, Clock, Building2, LocateFixed } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-
+import { reoptimizeRoutes } from '@/app/actions'
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
 const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
@@ -126,20 +126,36 @@ export function AdminPlaygroundTab({ pdvs = [], users = [] }: { pdvs?: any[]; us
     }
   }, [simResults, mapPdvs])
 
-  const handleSimulate = () => {
+  const handleSimulate = async () => {
     setIsSimulating(true)
-    setTimeout(() => {
-      setIsSimulating(false)
-      setSimResults({
-        totalDistance: (mapPdvs.length * 1.8).toFixed(1),
-        optimalTime: Math.round(mapPdvs.length * minTimePDV + (mapPdvs.length * 1.8 * 60) / avgSpeed),
-        coverage: 98.4
-      })
+    try {
+      const res = await reoptimizeRoutes()
+      if ('error' in res && res.error) {
+        toast({
+          variant: 'destructive',
+          title: "Error en Simulación",
+          description: res.error,
+        })
+      } else {
+        setSimResults({
+          totalDistance: (mapPdvs.length * 1.8).toFixed(1),
+          optimalTime: Math.round(mapPdvs.length * minTimePDV + (mapPdvs.length * 1.8 * 60) / avgSpeed),
+          coverage: 98.4
+        })
+        toast({
+          title: "Optimización de IA Completada",
+          description: `Rutas maestras recalculadas con éxito para toda la fuerza laboral.`,
+        })
+      }
+    } catch (e: any) {
       toast({
-        title: "Simulación de Enrutamiento Completa",
-        description: `Ruta óptima trazada para ${mapPdvs.length} PDVs utilizando velocidad promedio de ${avgSpeed} km/h.`,
+        variant: 'destructive',
+        title: "Error en el servidor",
+        description: e.message || 'Error desconocido.',
       })
-    }, 1500)
+    } finally {
+      setIsSimulating(false)
+    }
   }
 
   const handleCityChange = (city: string) => {

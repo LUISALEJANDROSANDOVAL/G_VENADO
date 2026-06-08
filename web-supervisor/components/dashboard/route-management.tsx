@@ -1719,7 +1719,11 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
                           <div className="flex items-center gap-2">
                             {/* Status badge */}
-                            {(tomorrowPublished || assignedWorkers[p.reponedorId] || p.published) ? (
+                            {plannedCount === 0 ? (
+                              <span className="px-3.5 py-1.5 rounded-full border text-[10px] font-extrabold bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20 shadow-3xs uppercase tracking-wider">
+                                Sin Ruta
+                              </span>
+                            ) : (tomorrowPublished || assignedWorkers[p.reponedorId] || p.published) ? (
                               <span className="px-3.5 py-1.5 rounded-full border text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 shadow-3xs uppercase tracking-wider">
                                 ✓ Asignada
                               </span>
