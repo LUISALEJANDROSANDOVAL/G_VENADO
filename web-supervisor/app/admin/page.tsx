@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { getAdminDashboardData } from '@/app/actions'
+import { getAdminDashboardData, getAdminAuditData } from '@/app/actions'
 
 import { Navbar } from '@/components/dashboard/navbar'
 import { Sidebar } from '@/components/dashboard/sidebar'
@@ -28,6 +28,10 @@ export default function AdminDashboard() {
   // Data state
   const [users, setUsers] = useState<any[]>([])
   const [pdvs, setPdvs] = useState<any[]>([])
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [activeSessions, setActiveSessions] = useState<any[]>([])
+  const [auditStats, setAuditStats] = useState<any>(null)
   const [isLoadingData, setIsLoadingData] = useState(true)
 
   // Active Tab — starts on overview/dashboard
@@ -60,20 +64,37 @@ export default function AdminDashboard() {
     } finally {
       setIsCheckingAuth(false)
     }
-  }, [router])
+  }, [router, toast])
 
   const loadData = async () => {
     setIsLoadingData(true)
     try {
-      const res = await getAdminDashboardData()
+      const [res, auditRes] = await Promise.all([
+        getAdminDashboardData(),
+        getAdminAuditData()
+      ])
+
       if (res.success) {
         setUsers(res.users ?? [])
         setPdvs(res.pdvs ?? [])
+        setRecentActivity(res.recentActivity ?? [])
       } else {
         toast({
           variant: 'destructive',
-          title: 'Error al cargar datos',
+          title: 'Error al cargar datos generales',
           description: res.error || 'No se pudieron obtener los registros.',
+        })
+      }
+
+      if (auditRes.success) {
+        setAuditLogs(auditRes.auditLogs ?? [])
+        setActiveSessions(auditRes.activeSessions ?? [])
+        setAuditStats(auditRes.auditStats ?? null)
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error al cargar bitácora',
+          description: auditRes.error || 'No se pudo cargar la auditoría.',
         })
       }
     } catch (e) {
@@ -85,6 +106,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (isAdmin) loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
   // Loading / auth guard screen
@@ -134,6 +156,7 @@ export default function AdminDashboard() {
                     users={users}
                     pdvs={pdvs}
                     currentUserEmail={adminUser?.email}
+                    recentActivity={recentActivity}
                   />
                 )}
 
@@ -156,7 +179,11 @@ export default function AdminDashboard() {
 
                 {/* TAB 3: AUDIT LOGS */}
                 {activeTab === 'audit' && (
-                  <AdminAuditTab />
+                  <AdminAuditTab 
+                    auditLogs={auditLogs}
+                    activeSessions={activeSessions}
+                    auditStats={auditStats}
+                  />
                 )}
 
                 {/* TAB 4: MEDIA QA */}
