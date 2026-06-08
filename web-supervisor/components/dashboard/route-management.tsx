@@ -896,7 +896,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
       evidences: status === 'Completada' ? (evidencesByWorker[w.name] || []) : [],
       sequence: w.sequence || []
     }
-  }).filter(entry => entry.status === 'Completada')
+  })
 
   return (
     <div className="space-y-6 w-full mx-auto">
@@ -1414,7 +1414,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                 className="flex items-center gap-2.5 bg-[#0B2545]/60 border border-slate-600/50 hover:border-[#4EE39D]/50 transition-all duration-300 rounded-full px-4 py-2 shadow-inner group cursor-pointer"
               />
               <span className="px-4 py-2 rounded-full border text-[10px] font-extrabold bg-transparent text-[#4EE39D] border-[#4EE39D]/30 shadow-xs shrink-0 uppercase tracking-wide">
-                Solo Completadas
+                Todas las Rutas
               </span>
             </div>
           </div>
