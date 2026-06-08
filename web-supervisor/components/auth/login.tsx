@@ -9,7 +9,7 @@ interface LoginProps {
 }
 
 export function Login({ onLoginSuccess }: LoginProps) {
-  const [email, setEmail] = useState('supervisor@gmail.com')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
@@ -214,11 +214,27 @@ export function Login({ onLoginSuccess }: LoginProps) {
             </form>
             
             {/* Footer Help */}
-            <div className="mt-margin-page pt-stack-gap border-t border-outline-variant/30 text-center">
-              <p className="font-body-md text-on-surface-variant">
-                ¿Tiene problemas para ingresar? <br/>
-                Contacte a <span className="text-on-surface font-bold">soporte@torredecontrol.com</span>
-              </p>
+            <div className="mt-margin-page pt-stack-gap border-t border-outline-variant/30">
+              <div className="space-y-3">
+                <p className="font-body-md text-on-surface-variant text-center text-sm">
+                  ¿Tiene problemas para ingresar?{' '}
+                  <span className="text-on-surface font-bold">soporte@grupovenado.com</span>
+                </p>
+                <div className="bg-outline-variant/10 rounded-xl p-4 space-y-2">
+                  <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Cuentas de acceso disponibles:</p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-mono text-on-surface">supervisor@gmail.com</span>
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase">Supervisor</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-mono text-on-surface">administrador@gmail.com</span>
+                      <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase">Admin</span>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant mt-1">Contraseña: <span className="font-mono font-bold text-on-surface">12345678</span></p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Login } from '@/components/auth/login'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import { useRouter } from 'next/navigation'
 
 const CITY_FILTERS: Record<string, { zonas: { nombre: string, supervisores: string[] }[] }> = {
   'Santa Cruz': {
@@ -94,14 +95,46 @@ export default function ControlTowerDashboard() {
   const [exportNotification, setExportNotification] = useState('')
   const { toast } = useToast()
 
+  const router = useRouter()
+
   useEffect(() => {
     // Check if the user is already logged in
-    const session = localStorage.getItem('supervisor_session')
-    if (session) {
-      setIsLoggedIn(true)
+    const sessionStr = localStorage.getItem('supervisor_session')
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr)
+        if (session.role === 'ADMIN') {
+          router.push('/admin')
+        } else if (session.role === 'SUPERVISOR') {
+          setIsLoggedIn(true)
+        } else {
+          setIsLoggedIn(true)
+        }
+      } catch (e) {
+        console.error('Error parsing session:', e)
+        setIsLoggedIn(true)
+      }
     }
     setIsCheckingAuth(false)
-  }, [])
+  }, [router])
+
+  const handleLoginSuccess = () => {
+    const sessionStr = localStorage.getItem('supervisor_session')
+    if (sessionStr) {
+      try {
+        const session = JSON.parse(sessionStr)
+        if (session.role === 'ADMIN') {
+          router.push('/admin')
+        } else {
+          setIsLoggedIn(true)
+        }
+      } catch (e) {
+        setIsLoggedIn(true)
+      }
+    } else {
+      setIsLoggedIn(true)
+    }
+  }
 
   const handleExport = (format: string) => {
     setShowExportDropdown(false)
@@ -460,7 +493,7 @@ export default function ControlTowerDashboard() {
   }
 
   if (!isLoggedIn) {
-    return <Login onLoginSuccess={() => setIsLoggedIn(true)} />
+    return <Login onLoginSuccess={handleLoginSuccess} />
   }
 
   return (

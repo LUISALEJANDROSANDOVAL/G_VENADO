@@ -1514,7 +1514,6 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                   />
 
                   <Button
-                    className="rounded-full bg-[#10b981] hover:bg-[#059669] text-[#022c22] font-extrabold shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all px-6 py-4 h-auto text-[11px] tracking-wider uppercase"
                     disabled={isPublishingTomorrow || tomorrowPublished || !tomorrowPlans || tomorrowPlans.length === 0}
                     onClick={async () => {
                       if (tomorrowPublished || !tomorrowPlans) return

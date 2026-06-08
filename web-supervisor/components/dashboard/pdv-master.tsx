@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Search, Upload, Download, Eye, Flag, Copy, Check, ExternalLink, X } from 'lucide-react'
+import {
+  Search, Upload, Download, Eye, Flag, Copy, Check, ExternalLink, X,
+  Plus, Pencil, Trash2, Store, Tag, Compass, Clock, MapPin, Building2
+} from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -21,10 +25,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { PDV, ClientType, WeekDay } from '@/lib/mock-data'
 import { uploadPdvs, createPdv, updatePdv, deletePdv } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
@@ -321,10 +323,13 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
 
   const filteredPDVs = useMemo(() => {
     return pdvs.filter((pdv) => {
+      const displayName = pdv.nombre ?? (pdv as any).name ?? ''
+      const displayId   = pdv.id ?? ''
+      const displayType = pdv.type ?? (pdv as any).category ?? ''
       const matchesSearch =
-        pdv.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pdv.id.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesType = filterType === 'all' || pdv.type === filterType
+        displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        displayId.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesType = filterType === 'all' || displayType.toUpperCase() === filterType.toUpperCase()
       const matchesStatus =
         filterStatus === 'all' ||
         (filterStatus === 'visited' && pdv.visited) ||
@@ -379,48 +384,49 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
   }
 
   const typeColor = (type: string) => {
-    switch (type) {
-      case 'Pareto':    return 'bg-red-500/15 text-red-300 border-red-500/30'
-      case 'Mayorista': return 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-      case 'Detallista': return 'bg-slate-500/15 text-slate-400 border-slate-500/30'
-      default: return 'bg-slate-500/15 text-slate-400 border-slate-500/30'
+    const t = (type ?? '').toUpperCase()
+    if (t === 'PARETO') {
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-none'
     }
+    if (t === 'MAYORISTA') {
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border-none'
+    }
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-none'
   }
 
   return (
-    <div className="space-y-6 w-full mx-auto animate-in fade-in">
+    <div className="space-y-5 w-full mx-auto animate-in fade-in duration-200">
       {/* Title and Actions Row */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-4">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold">Listado de Puntos de Venta</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Mostrando {startRow}-{endRow} de {filteredPDVs.length} PDVs filtrados
+          <h2 className="text-2xl font-black tracking-tight text-foreground">
+            Directorio de Puntos de Venta
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Administra los puntos de venta maestros, carga plantillas geográficas y exporta reportes de cobertura.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Button
-            size="sm"
             onClick={() => handleOpenPdvModal()}
-            className="gap-2 bg-primary hover:bg-primary/90 text-white font-medium shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-bold px-5 h-10 rounded-xl shadow-md cursor-pointer transition-all shrink-0"
           >
             <Plus className="h-4 w-4" />
             Nuevo PDV
           </Button>
           <Button
-            size="sm"
             onClick={() => setShowUploadZone(!showUploadZone)}
             variant="outline"
-            className={`gap-2 cursor-pointer transition-colors font-medium shadow-sm ${showUploadZone ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' : 'bg-background/50 border-border text-foreground/80'}`}
+            className={`h-10 px-5 rounded-xl border border-border shadow-md font-semibold text-sm cursor-pointer transition-all gap-2 ${showUploadZone ? 'bg-primary/10 border-primary text-primary hover:bg-primary/20' : 'bg-background hover:bg-muted'}`}
           >
             <Upload className="h-4 w-4" />
             Importar CSV
           </Button>
           <Button 
-            size="sm"
             onClick={handleExportBI} 
             variant="outline" 
-            className="gap-2 border-primary text-primary bg-background/50 hover:bg-primary/5 cursor-pointer font-medium shadow-sm"
+            className="h-10 px-5 rounded-xl border border-blue-600/30 hover:border-blue-600 text-blue-600 dark:text-blue-400 bg-background/50 hover:bg-blue-600/5 cursor-pointer font-bold shadow-md transition-all gap-2"
           >
             <Download className="h-4 w-4" />
             Exportar para BI
@@ -429,19 +435,19 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
       </div>
 
       {/* Search and Filters Row */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 w-full mb-4">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Buscar por nombre comercial o ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 w-full bg-background/50 border-border shadow-sm text-sm"
+            className="pl-10 h-10 bg-background border-border rounded-xl w-full text-sm"
           />
         </div>
         <Select value={filterType} onValueChange={(v) => setFilterType(v as ClientType | 'all')}>
-          <SelectTrigger className="w-full sm:w-[160px] bg-background/50 text-sm shadow-sm">
-            <SelectValue placeholder="Filtrar por tipo" />
+          <SelectTrigger className="w-full sm:w-44 h-10 bg-background border-border rounded-xl font-semibold text-sm cursor-pointer">
+            <SelectValue placeholder="Todos los tipos" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los tipos</SelectItem>
@@ -451,19 +457,24 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'visited' | 'unvisited')}>
-          <SelectTrigger className="w-full sm:w-[160px] bg-background/50 text-sm shadow-sm">
-            <SelectValue placeholder="Filtrar por estado" />
+          <SelectTrigger className="w-full sm:w-48 h-10 bg-background border-border rounded-xl font-semibold text-sm cursor-pointer">
+            <SelectValue placeholder="Todos los estados" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="visited">Visitado</SelectItem>
-            <SelectItem value="unvisited">No visitado</SelectItem>
+            <SelectItem value="visited">Visitados hoy</SelectItem>
+            <SelectItem value="unvisited">No visitados hoy</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
+      {/* Count label */}
+      <p className="text-xs text-muted-foreground font-semibold -mt-2">
+        Mostrando {filteredPDVs.length} de {pdvs.length} puntos de venta registrados
+      </p>
+
       {showUploadZone && (
-        <Card className="border-dashed border-2 border-primary/40 bg-primary/5 animate-in slide-in-from-top-4 duration-300">
+        <Card className="border-dashed border-2 border-primary/40 bg-primary/5 animate-in slide-in-from-top-4 duration-300 rounded-2xl">
           <CardContent className="pt-6">
             <input 
               type="file" 
@@ -474,7 +485,7 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
             />
             <div 
               onClick={triggerUpload}
-              className={`flex items-center justify-center gap-4 py-8 cursor-pointer hover:bg-muted/30 rounded-lg transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`flex items-center justify-center gap-4 py-8 cursor-pointer hover:bg-muted/30 rounded-xl transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Upload className="h-6 w-6 text-primary" />
               <div>
@@ -490,19 +501,18 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
         </Card>
       )}
 
-      <Card className="border-border w-full shadow-sm">
-        <CardContent className="pt-6">
-          <div className="rounded-lg border border-border overflow-x-auto w-full">
-            <Table className="w-full">
-              <TableHeader className="bg-muted/50">
-                <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-foreground/70 font-semibold w-[30%]">Nombre Comercial</TableHead>
-                  <TableHead className="text-foreground/70 font-semibold w-[12%]">Clasificación</TableHead>
-                  <TableHead className="text-foreground/70 font-semibold w-[22%]">Coordenadas</TableHead>
-                  <TableHead className="text-foreground/70 font-semibold w-[18%]">Disponibilidad</TableHead>
-                  <TableHead className="text-foreground/70 font-semibold w-[8%] text-center">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
+      <div className="border border-border rounded-2xl overflow-hidden bg-card shadow-sm w-full">
+        <div className="overflow-x-auto w-full">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="bg-muted/40 border-border hover:bg-muted/40">
+                <TableHead className="pl-6 py-3.5 font-bold text-xs uppercase tracking-wider text-muted-foreground w-[30%]">Nombre Comercial</TableHead>
+                <TableHead className="py-3.5 font-bold text-xs uppercase tracking-wider text-muted-foreground w-[15%]">Clasificación</TableHead>
+                <TableHead className="py-3.5 font-bold text-xs uppercase tracking-wider text-muted-foreground w-[22%]">Coordenadas</TableHead>
+                <TableHead className="py-3.5 font-bold text-xs uppercase tracking-wider text-muted-foreground w-[18%]">Disponibilidad</TableHead>
+                <TableHead className="py-3.5 pr-6 font-bold text-xs uppercase tracking-wider text-muted-foreground w-[15%] text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
               <TableBody>
                 {paginatedPDVs.map((pdv) => (
                   <TableRow key={pdv.id} className="border-border group hover:bg-muted/30 hover:translate-x-1 transition-all duration-300 cursor-default">
@@ -581,38 +591,38 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <TableCell className="py-3.5 pr-6 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
-                          size="icon"
                           variant="ghost"
+                          size="icon"
                           onClick={() => handleOpenPdvModal(pdv)}
-                          className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer"
                           title="Editar PDV"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
-                          size="icon"
                           variant="ghost"
+                          size="icon"
                           onClick={() => handleDeletePdv(pdv.id, pdv.nombre)}
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
                           title="Eliminar PDV"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                         <Button
-                          size="icon"
                           variant="ghost"
+                          size="icon"
                           onClick={() => {
                             setSelectedPdvReport(pdv)
                             setReportType('coordinates')
                             setReportDetails('')
                           }}
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          className="h-8 w-8 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 cursor-pointer"
                           title="Reportar Inconsistencia"
                         >
-                          <Flag className="h-4 w-4" />
+                          <Flag className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -622,102 +632,102 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
             </Table>
           </div>
 
-          {/* Pagination Controls */}
-          {filteredPDVs.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-border">
-              {/* Rows per page selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Filas por página:</span>
-                <select
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value))
-                    setCurrentPage(1)
-                  }}
-                  className="bg-card border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-                <span className="text-xs text-muted-foreground">
-                  Mostrando {startRow} - {endRow} de {filteredPDVs.length} PDVs
-                </span>
-              </div>
-
-              {/* Page navigation */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="h-8 px-2 text-xs cursor-pointer font-semibold"
-                >
-                  Primero
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 px-2 text-xs cursor-pointer font-semibold"
-                >
-                  Anterior
-                </Button>
-                
-                {/* Dynamic Page Numbers */}
-                {pageNumbers.map((p, idx) => {
-                  if (p === '...') {
-                    return (
-                      <span key={`dots-${idx}`} className="px-2 text-xs text-muted-foreground">
-                        ...
-                      </span>
-                    )
-                  }
-                  return (
-                    <Button
-                      key={p}
-                      variant={currentPage === p ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCurrentPage(Number(p))}
-                      className={`h-8 w-8 text-xs cursor-pointer font-semibold ${currentPage === p ? 'bg-primary text-primary-foreground' : ''}`}
-                    >
-                      {p}
-                    </Button>
-                  )
-                })}
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="h-8 px-2 text-xs cursor-pointer font-semibold"
-                >
-                  Siguiente
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="h-8 px-2 text-xs cursor-pointer font-semibold"
-                >
-                  Último
-                </Button>
-              </div>
-            </div>
-          )}
-
           {filteredPDVs.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="text-muted-foreground">Ningún PDV coincide con los filtros</p>
+            <div className="py-16 text-center border-t border-border bg-card">
+              <p className="text-sm font-semibold text-muted-foreground">Ningún PDV coincide con los filtros</p>
+              <p className="text-xs text-muted-foreground mt-1">Intenta ajustar los filtros de búsqueda</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+
+        {/* Pagination Controls */}
+        {filteredPDVs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border bg-card">
+            {/* Rows per page selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filas por página:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value))
+                  setCurrentPage(1)
+                }}
+                className="bg-card border border-border rounded-xl px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="text-xs text-muted-foreground">
+                Mostrando {startRow} - {endRow} de {filteredPDVs.length} PDVs
+              </span>
+            </div>
+
+            {/* Page navigation */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="h-8 px-2 text-xs cursor-pointer font-semibold rounded-lg"
+              >
+                Primero
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="h-8 px-2 text-xs cursor-pointer font-semibold rounded-lg"
+              >
+                Anterior
+              </Button>
+              
+              {/* Dynamic Page Numbers */}
+              {pageNumbers.map((p, idx) => {
+                if (p === '...') {
+                  return (
+                    <span key={`dots-${idx}`} className="px-2 text-xs text-muted-foreground">
+                      ...
+                    </span>
+                  )
+                }
+                return (
+                  <Button
+                    key={p}
+                    variant={currentPage === p ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCurrentPage(Number(p))}
+                    className={`h-8 w-8 text-xs cursor-pointer font-semibold rounded-lg ${currentPage === p ? 'bg-primary text-primary-foreground' : ''}`}
+                  >
+                    {p}
+                  </Button>
+                )
+              })}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="h-8 px-2 text-xs cursor-pointer font-semibold rounded-lg"
+              >
+                Siguiente
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="h-8 px-2 text-xs cursor-pointer font-semibold rounded-lg"
+              >
+                Último
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {selectedPdvHistory && (
         <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-200">
@@ -879,63 +889,155 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
         </div>
       )}
 
-      {/* Nuevo/Editar PDV Modal */}
+      {/* ─── PDV Create / Edit Modal ─── Premium Design ─────────────── */}
       <Dialog open={isPdvModalOpen} onOpenChange={setIsPdvModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>{editPdvData ? 'Editar Punto de Venta' : 'Añadir Nuevo Punto de Venta'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Nombre Comercial</label>
-              <Input value={pdvFormData.name} onChange={e => setPdvFormData({ ...pdvFormData, name: e.target.value })} className="col-span-3 text-sm" placeholder="Ej. Supermercado Ketal" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Ciudad/Mercado</label>
-              <Select disabled value={pdvFormData.market} onValueChange={v => setPdvFormData({ ...pdvFormData, market: v })}>
-                <SelectTrigger className="col-span-3 text-sm">
-                  <SelectValue placeholder="Selecciona una ciudad" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Santa Cruz">Santa Cruz</SelectItem>
-                  <SelectItem value="Cochabamba">Cochabamba</SelectItem>
-                  <SelectItem value="La Paz">La Paz</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Clasificación</label>
-              <Select value={pdvFormData.category} onValueChange={v => setPdvFormData({ ...pdvFormData, category: v })}>
-                <SelectTrigger className="col-span-3 text-sm">
-                  <SelectValue placeholder="Selecciona una categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PARETO">Pareto</SelectItem>
-                  <SelectItem value="MAYORISTA">Mayorista</SelectItem>
-                  <SelectItem value="DETALLISTA">Detallista</SelectItem>
-                  <SelectItem value="MINORISTA">Minorista</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Latitud</label>
-              <Input type="number" step="0.000001" value={pdvFormData.latitude} onChange={e => setPdvFormData({ ...pdvFormData, latitude: e.target.value })} className="col-span-3 text-sm font-mono" placeholder="-17.7862" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Longitud</label>
-              <Input type="number" step="0.000001" value={pdvFormData.longitude} onChange={e => setPdvFormData({ ...pdvFormData, longitude: e.target.value })} className="col-span-3 text-sm font-mono" placeholder="-63.1812" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-right text-xs font-semibold">Duración Base (min)</label>
-              <Input type="number" value={pdvFormData.base_duration_minutes} onChange={e => setPdvFormData({ ...pdvFormData, base_duration_minutes: e.target.value })} className="col-span-3 text-sm" placeholder="30" />
+        <DialogContent className="sm:max-w-[540px] p-0 gap-0 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden">
+
+          {/* Header */}
+          <div className={`px-6 pt-6 pb-5 border-b border-border ${editPdvData ? 'bg-blue-600/5 dark:bg-blue-600/10' : 'bg-emerald-600/5 dark:bg-emerald-600/10'}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-inner ${editPdvData ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-black text-foreground leading-tight">
+                    {editPdvData ? 'Editar Punto de Venta' : 'Nuevo Punto de Venta'}
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {editPdvData
+                      ? `Modificando: ${editPdvData.nombre ?? editPdvData.name ?? editPdvData.id}`
+                      : 'Registrar un nuevo PDV en el directorio logístico'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost" size="icon"
+                onClick={() => setIsPdvModalOpen(false)}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer -mt-1 -mr-1"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPdvModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSavePdv} disabled={isSavingPdv || !pdvFormData.name || !pdvFormData.latitude || !pdvFormData.longitude}>
-              {isSavingPdv ? 'Guardando...' : 'Guardar PDV'}
+
+          {/* Body */}
+          <div className="px-6 py-5 space-y-4">
+
+            {/* Nombre */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Store className="h-3.5 w-3.5 text-muted-foreground" /> Nombre Comercial
+              </Label>
+              <Input
+                value={pdvFormData.name}
+                onChange={e => setPdvFormData({ ...pdvFormData, name: e.target.value })}
+                className="h-10 bg-background border-border rounded-xl text-sm"
+                placeholder="Ej. Supermercado Ketal Centro"
+              />
+            </div>
+
+            {/* Clasificación + Ciudad */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-muted-foreground" /> Clasificación
+                </Label>
+                <Select value={pdvFormData.category} onValueChange={v => setPdvFormData({ ...pdvFormData, category: v })}>
+                  <SelectTrigger className="h-10 bg-background border-border rounded-xl text-sm cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PARETO">🔴 Pareto</SelectItem>
+                    <SelectItem value="MAYORISTA">🟡 Mayorista</SelectItem>
+                    <SelectItem value="DETALLISTA">🟢 Detallista</SelectItem>
+                    <SelectItem value="MINORISTA">🔵 Minorista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" /> Ciudad / Mercado
+                </Label>
+                <Select disabled value={pdvFormData.market} onValueChange={v => setPdvFormData({ ...pdvFormData, market: v })}>
+                  <SelectTrigger className="h-10 bg-background border-border rounded-xl text-sm cursor-pointer disabled:opacity-70">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Santa Cruz">Santa Cruz</SelectItem>
+                    <SelectItem value="Cochabamba">Cochabamba</SelectItem>
+                    <SelectItem value="La Paz">La Paz</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">Se calcula automáticamente por longitud</p>
+              </div>
+            </div>
+
+            {/* Coordenadas */}
+            <div className="border border-border rounded-xl p-4 bg-muted/20 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Compass className="h-4 w-4 text-muted-foreground" /> Coordenadas GPS (WGS84)
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Latitud</Label>
+                  <Input
+                    type="number" step="0.000001"
+                    value={pdvFormData.latitude}
+                    onChange={e => setPdvFormData({ ...pdvFormData, latitude: e.target.value })}
+                    className="h-9 bg-background border-border rounded-lg text-xs font-mono"
+                    placeholder="-17.7862"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase">Longitud</Label>
+                  <Input
+                    type="number" step="0.000001"
+                    value={pdvFormData.longitude}
+                    onChange={e => setPdvFormData({ ...pdvFormData, longitude: e.target.value })}
+                    className="h-9 bg-background border-border rounded-lg text-xs font-mono"
+                    placeholder="-63.1812"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Duración */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Tiempo de Auditoría (minutos)
+              </Label>
+              <Input
+                type="number"
+                value={pdvFormData.base_duration_minutes}
+                onChange={e => setPdvFormData({ ...pdvFormData, base_duration_minutes: e.target.value })}
+                className="h-10 bg-background border-border rounded-xl text-sm"
+                placeholder="30"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 pb-6 flex items-center justify-end gap-3 border-t border-border pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsPdvModalOpen(false)}
+              className="rounded-xl font-semibold border-border hover:bg-muted cursor-pointer h-10 px-5"
+            >
+              Cancelar
             </Button>
-          </DialogFooter>
+            <Button
+              onClick={handleSavePdv}
+              disabled={isSavingPdv || !pdvFormData.name || !pdvFormData.latitude || !pdvFormData.longitude}
+              className={`h-10 px-6 rounded-xl font-bold text-white shadow-md cursor-pointer transition-all ${
+                editPdvData
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+              {isSavingPdv ? 'Guardando...' : editPdvData ? 'Guardar Cambios' : 'Crear PDV'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
