@@ -18,7 +18,7 @@ const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number 
   'La Paz': { lat: -16.5000, lng: -68.1500, zoom: 12 },
 }
 
-export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
+export function AdminPlaygroundTab({ pdvs = [], users = [] }: { pdvs?: any[]; users?: any[] }) {
   const { toast } = useToast()
   
   // Algoritmo variables
@@ -35,6 +35,7 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
   const [showPareto, setShowPareto] = useState(true)
   const [showMayorista, setShowMayorista] = useState(true)
   const [showDetallista, setShowDetallista] = useState(true)
+  const [showWorkers, setShowWorkers] = useState(true)
   const [showRoute, setShowRoute] = useState(true)
 
   // Map state
@@ -45,27 +46,71 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
     zoom: 12
   })
 
-  // Safe subset of PDVs to render on map (limit to 30 for performance in simulation)
-  const mapPdvs = useMemo(() => {
-    let filtered = pdvs.map(p => ({
-      id: p.id,
-      name: p.nombre ?? p.name ?? '',
-      lat: Number(p.latitude || p.lat || -17.7862),
-      lng: Number(p.longitude || p.lng || -63.1812),
-      category: (p.category ?? p.type ?? 'DETALLISTA').toUpperCase(),
-      city: p.city ?? p.market ?? 'Santa Cruz'
-    }))
+  // Safe subset of PDVs to render on map (limit to 150 for performance in simulation)
+  const resolvedPdvs = useMemo(() => {
+    return pdvs.map(p => {
+      const lat = Number(p.latitude || p.lat || -17.7862)
+      const lng = Number(p.longitude || p.lng || -63.1812)
+      
+      let city = p.market || 'Santa Cruz'
+      if (!isNaN(lng)) {
+        if (lng < -67) city = 'La Paz'
+        else if (lng > -64) city = 'Santa Cruz'
+        else city = 'Cochabamba'
+      }
 
-    filtered = filtered.filter(p => {
+      return {
+        id: p.id,
+        name: p.nombre ?? p.name ?? '',
+        lat,
+        lng,
+        category: (p.category ?? p.type ?? 'DETALLISTA').toUpperCase(),
+        city
+      }
+    })
+  }, [pdvs])
+
+  const mapReponedores = useMemo(() => {
+    const reps = users.filter(u => u.role === 'REPONEDOR' && u.is_active !== false)
+    return reps.map((user, idx) => {
+      const workerCity = user.departamento || ['Cochabamba', 'Santa Cruz', 'La Paz'][idx % 3]
+      const cityCoords = {
+        'Cochabamba': { lat: -17.3895, lng: -66.1568 },
+        'Santa Cruz': { lat: -17.7862, lng: -63.1812 },
+        'La Paz': { lat: -16.5000, lng: -68.1500 }
+      }
+      const coords = cityCoords[workerCity as keyof typeof cityCoords] || cityCoords['Santa Cruz']
+
+      return {
+        id: user.id,
+        name: user.name,
+        city: workerCity,
+        lat: coords.lat + (idx * 0.005),
+        lng: coords.lng + (idx * 0.005),
+      }
+    })
+  }, [users])
+
+  const filteredPdvs = useMemo(() => {
+    return resolvedPdvs.filter(p => {
       if (selectedCity !== 'Todas' && p.city !== selectedCity) return false
       if (p.category === 'PARETO' && !showPareto) return false
       if (p.category === 'MAYORISTA' && !showMayorista) return false
       if (p.category === 'DETALLISTA' && !showDetallista) return false
       return true
     })
+  }, [resolvedPdvs, selectedCity, showPareto, showMayorista, showDetallista])
 
-    return filtered.slice(0, 30)
-  }, [pdvs, selectedCity, showPareto, showMayorista, showDetallista])
+  const mapPdvs = useMemo(() => {
+    return filteredPdvs.slice(0, 150)
+  }, [filteredPdvs])
+
+  const filteredReponedores = useMemo(() => {
+    return mapReponedores.filter(r => {
+      if (selectedCity !== 'Todas' && r.city !== selectedCity) return false
+      return true
+    })
+  }, [mapReponedores, selectedCity])
 
   // GeoJSON line for route simulation
   const routeGeoJSON = useMemo(() => {
@@ -320,6 +365,20 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
                   )
                 })}
 
+                {/* Render reponedores markers */}
+                {showWorkers && filteredReponedores.map(worker => (
+                  <Marker key={`worker-${worker.id}`} longitude={worker.lng} latitude={worker.lat} anchor="center">
+                    <div className="relative flex items-center justify-center">
+                       {/* Glow effect */}
+                       <div className="absolute w-12 h-12 bg-emerald-500/30 rounded-full animate-ping" />
+                       {/* Modern Vehicle Marker */}
+                       <div className="w-5 h-5 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10 border-2 border-white flex items-center justify-center">
+                         <span className="text-[9px] font-bold text-white uppercase">{worker.name.charAt(0)}</span>
+                       </div>
+                    </div>
+                  </Marker>
+                ))}
+
                 {/* Render simulated route path */}
                 {routeGeoJSON && showRoute && (
                   <Source id="sim-route" type="geojson" data={routeGeoJSON}>
@@ -344,6 +403,7 @@ export function AdminPlaygroundTab({ pdvs = [] }: { pdvs?: any[] }) {
               <FilterBtn active={showPareto} onClick={() => setShowPareto(!showPareto)} color="#ff3366" label="PDVs Pareto" />
               <FilterBtn active={showMayorista} onClick={() => setShowMayorista(!showMayorista)} color="#33ccff" label="PDVs Mayoristas" />
               <FilterBtn active={showDetallista} onClick={() => setShowDetallista(!showDetallista)} color="#a1a1aa" label="PDVs Detallistas" />
+              <FilterBtn active={showWorkers} onClick={() => setShowWorkers(!showWorkers)} color="#10b981" label="Reponedores" />
               <FilterBtn active={showRoute} onClick={() => setShowRoute(!showRoute)} color="#7b61ff" label="Simulación de Ruta" />
             </div>
           </div>

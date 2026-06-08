@@ -485,6 +485,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
   const [optimizeStep, setOptimizeStep] = useState(0)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'operations' | 'history' | 'tomorrow'>('operations')
+  const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null)
 
   // Dynamic planning date picker
   const [planningDateStr, setPlanningDateStr] = useState(() => {
@@ -1652,6 +1653,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                     : "Optimización de recorrido TSP: Secuencia reordenada para minimizar la distancia total y tiempos de traslado."
 
                   const isExpanded = !!expandedTomorrowCards[p.reponedorId]
+                  const isEditing = editingWorkerId === p.reponedorId
 
                   return (
                     <div key={p.reponedorId} className={[
@@ -1702,7 +1704,10 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                         </div>
 
                         {/* Collapsed Stats Summary + Status Badges */}
-                        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                        <div
+                          className="flex items-center gap-4 flex-wrap sm:flex-nowrap justify-between sm:justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {/* Quick Stats */}
                           <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/60 rounded-xl px-3.5 py-1.5 shadow-inner shrink-0">
                             <span className="text-[10px] font-extrabold text-slate-700 dark:text-slate-300">{plannedCount} PDVs</span>
@@ -1714,7 +1719,7 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
                           <div className="flex items-center gap-2">
                             {/* Status badge */}
-                            {(tomorrowPublished || assignedWorkers[p.reponedorId]) ? (
+                            {(tomorrowPublished || assignedWorkers[p.reponedorId] || p.published) ? (
                               <span className="px-3.5 py-1.5 rounded-full border text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 shadow-3xs uppercase tracking-wider">
                                 ✓ Asignada
                               </span>
@@ -1723,17 +1728,30 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                 Sugerida
                               </span>
                             )}
-                            {/* Per-worker Assign Route Button */}
+                            {/* Per-worker Assign Route / Edit Button */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleAssignWorkerRoute(p.reponedorId, p.reponedorName)
+                                if (tomorrowPublished || assignedWorkers[p.reponedorId] || p.published) {
+                                  const isEditing = editingWorkerId === p.reponedorId
+                                  if (isEditing) {
+                                    setEditingWorkerId(null)
+                                  } else {
+                                    setEditingWorkerId(p.reponedorId)
+                                    // Also auto-expand the card when starting to edit
+                                    setExpandedTomorrowCards(prev => ({ ...prev, [p.reponedorId]: true }))
+                                  }
+                                } else {
+                                  handleAssignWorkerRoute(p.reponedorId, p.reponedorName)
+                                }
                               }}
-                              disabled={isAssigningWorker === p.reponedorId || (tomorrowPublished && assignedWorkers[p.reponedorId]) || plannedCount === 0}
+                              disabled={isAssigningWorker === p.reponedorId || (plannedCount === 0 && !(tomorrowPublished || assignedWorkers[p.reponedorId] || p.published))}
                               className={[
                                 "flex items-center gap-1.5 text-[10px] font-extrabold px-3.5 py-2 rounded-xl border transition-all duration-200 shrink-0 cursor-pointer shadow-3xs",
-                                (tomorrowPublished || assignedWorkers[p.reponedorId])
-                                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400 cursor-default"
+                                (tomorrowPublished || assignedWorkers[p.reponedorId] || p.published)
+                                  ? (editingWorkerId === p.reponedorId)
+                                    ? "bg-emerald-500 hover:bg-emerald-600 text-white border-transparent"
+                                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-750"
                                   : plannedCount === 0
                                   ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500"
                                   : "bg-[#0B2545] hover:bg-[#163861] text-white border-transparent hover:scale-105 active:scale-95"
@@ -1741,8 +1759,8 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                             >
                               {isAssigningWorker === p.reponedorId ? (
                                 <><Loader2 className="h-3 w-3 animate-spin" /> Asignando...</>
-                              ) : (tomorrowPublished || assignedWorkers[p.reponedorId]) ? (
-                                <><Check className="h-3 w-3 stroke-[2.5]" /> Asignada</>
+                              ) : (tomorrowPublished || assignedWorkers[p.reponedorId] || p.published) ? (
+                                (editingWorkerId === p.reponedorId) ? <>Guardar</> : <>Editar</>
                               ) : (
                                 <><Send className="h-3.5 w-3.5 rotate-45 mr-0.5 mt-[-1px]" /> Asignar</>
                               )}
@@ -1753,20 +1771,8 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
 
                       {/* Card Content (Visible only when expanded) */}
                       {isExpanded && (
-                        <div className="px-6 py-5 space-y-5 bg-slate-50/50 dark:bg-slate-950/20 border-t border-slate-100 dark:border-slate-800/80">
-                          {/* Horizontal Stop Sequence */}
-                          <div className="space-y-3.5">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4.5 py-3 rounded-xl border border-slate-100 dark:border-slate-800/80 shadow-3xs">
-                              <p className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <Store className="h-4 w-4 text-primary" />
-                                Secuencia Planificada de Paradas (Optimización TSP)
-                              </p>
-                              <span className="text-[9px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wide">
-                                Arrastra las tarjetas para reordenar
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 min-h-[135px]">
+                        <div className="px-6 py-5 space-y-4">
+                          <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 min-h-[135px]">
                               {p.sequence.map((pdvId: string, idx: number) => {
                                 const pdv = pdvs.find(pos => pos.id === pdvId)
                                 const name = pdv ? (pdv.nombre || pdv.name) : `Punto ${idx + 1}`
@@ -1778,17 +1784,18 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                   <div
                                     key={pdvId}
                                     className="flex items-center gap-3 shrink-0"
-                                    draggable
-                                    onDragStart={() => handleDragStart(p.reponedorId, idx)}
-                                    onDragOver={(e) => handleDragOver(e, p.reponedorId, idx)}
-                                    onDrop={() => handleDrop(p.reponedorId, idx)}
+                                    draggable={isEditing}
+                                    onDragStart={() => { if (isEditing) handleDragStart(p.reponedorId, idx) }}
+                                    onDragOver={(e) => { if (isEditing) handleDragOver(e, p.reponedorId, idx) }}
+                                    onDrop={() => { if (isEditing) handleDrop(p.reponedorId, idx) }}
                                     onDragEnd={() => {
                                       setDraggingIndex(null)
                                       setDragOverIndex(null)
                                     }}
                                   >
                                     <div className={[
-                                      "relative flex flex-col items-center p-4 rounded-2xl min-w-[150px] max-w-[170px] shadow-3xs group transition-all duration-300 cursor-grab active:cursor-grabbing select-none border",
+                                      "relative flex flex-col items-center p-4 rounded-2xl min-w-[150px] max-w-[170px] shadow-3xs group transition-all duration-300 select-none border",
+                                      isEditing ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                                       isDragging 
                                         ? "opacity-30 border-dashed border-slate-400 bg-slate-100 dark:bg-slate-800" 
                                         : isOver
@@ -1796,18 +1803,22 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                         : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800/80 hover:border-primary/30 dark:hover:border-primary/50 hover:-translate-y-1 hover:shadow-xs"
                                     ].join(" ")}>
                                       {/* Drag Handle */}
-                                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors">
-                                        <GripVertical className="h-4.5 w-4.5" />
-                                      </div>
+                                      {isEditing && (
+                                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors">
+                                          <GripVertical className="h-4.5 w-4.5" />
+                                        </div>
+                                      )}
 
                                       {/* Delete Button */}
-                                      <button
-                                        onClick={() => handleRemoveTomorrow(pdvId, p.reponedorId)}
-                                        className="absolute -top-1.5 -right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer z-10"
-                                        title="Quitar parada"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
+                                      {isEditing && (
+                                        <button
+                                          onClick={() => handleRemoveTomorrow(pdvId, p.reponedorId)}
+                                          className="absolute -top-1.5 -right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer z-10"
+                                          title="Quitar parada"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      )}
 
                                       <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary dark:text-blue-400 px-2.5 py-0.5 rounded-full bg-primary/5 border border-primary/10">
                                         Parada {idx + 1}
@@ -1831,34 +1842,35 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                 </div>
                               )}
                             </div>
-                          </div>
 
                           {/* Route Customization Options */}
-                          <div className="border-t border-slate-100 dark:border-slate-850/80 pt-4 flex flex-col md:flex-row gap-3">
-                            {/* Add PDV */}
-                            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 max-w-md w-full shadow-3xs">
-                              <span className="text-[10px] uppercase font-extrabold text-slate-400 dark:text-slate-500 shrink-0 tracking-wider">Añadir parada:</span>
-                              <select
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    handleAddTomorrow(e.target.value, p.reponedorId)
-                                    e.target.value = ''
-                                  }
-                                }}
-                                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 text-xs rounded-lg px-3 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 min-w-0 font-bold"
-                              >
-                                <option value="">— Seleccionar punto disponible —</option>
-                                {getUnassignedPdvsTomorrow(workerCity).map(pdv => {
-                                  const pCity = pdv.city || pdv.market || pdv.mercado || 'Sin ciudad'
-                                  return (
-                                    <option key={pdv.id} value={pdv.id}>
-                                      📍 {pdv.nombre || pdv.name} ({pdv.type} - {pCity})
-                                    </option>
-                                  )
-                                })}
-                              </select>
+                          {isEditing && (
+                            <div className="border-t border-slate-100 dark:border-slate-850/80 pt-4 flex flex-col md:flex-row gap-3 animate-in fade-in duration-200">
+                              {/* Add PDV */}
+                              <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 max-w-md w-full shadow-3xs">
+                                <span className="text-[10px] uppercase font-extrabold text-slate-400 dark:text-slate-500 shrink-0 tracking-wider">Añadir parada:</span>
+                                <select
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleAddTomorrow(e.target.value, p.reponedorId)
+                                      e.target.value = ''
+                                    }
+                                  }}
+                                  className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 text-xs rounded-lg px-3 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 min-w-0 font-bold"
+                                >
+                                  <option value="">— Seleccionar punto disponible —</option>
+                                  {getUnassignedPdvsTomorrow(workerCity).map(pdv => {
+                                    const pCity = pdv.city || pdv.market || pdv.mercado || 'Sin ciudad'
+                                    return (
+                                      <option key={pdv.id} value={pdv.id}>
+                                        📍 {pdv.nombre || pdv.name} ({pdv.type} - {pCity})
+                                      </option>
+                                    )
+                                  })}
+                                </select>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Feedback Loop Explanation */}
                           <div className="text-[10px] font-bold bg-blue-500/5 dark:bg-blue-950/15 border border-blue-500/15 dark:border-blue-900/30 rounded-xl px-4 py-3.5 text-slate-700 dark:text-blue-300 flex items-start gap-2.5 shadow-3xs">

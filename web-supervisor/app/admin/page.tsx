@@ -167,7 +167,7 @@ export default function AdminDashboard() {
                 {/* TAB 5: ROUTE SANDBOX */}
                 {activeTab === 'playground' && (
                   <div className="animate-in fade-in flex-1 min-h-0 flex flex-col">
-                    <AdminPlaygroundTab pdvs={pdvs} />
+                    <AdminPlaygroundTab pdvs={pdvs} users={users} />
                   </div>
                 )}
               </>

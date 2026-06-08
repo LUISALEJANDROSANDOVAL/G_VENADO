@@ -1028,22 +1028,9 @@ export async function getRoutesPlanForDate(dateStr: string) {
 
     if (usersErr) throw new Error(usersErr.message)
 
-    if (existingPlans && existingPlans.length > 0) {
-      // Map existing plans to response format
-      const mapped = existingPlans.map(p => {
-        const user = users?.find(u => u.id === p.reponedor_id)
-        return {
-          reponedorId: p.reponedor_id,
-          reponedorName: user?.name || 'Reponedor',
-          sequence: p.optimized_pos_sequence,
-          published: true,
-          status: p.status
-        }
-      })
-      return { published: true, plans: mapped }
-    }
+    const existingMap = new Map((existingPlans || []).map(p => [p.reponedor_id, p]))
 
-    // 2. No plans exist, generate suggestions
+    // 2. Generate suggestions / merge with existing plans
     const { data: pdvs, error: pdvsErr } = await supabaseAdmin
       .from('points_of_sale')
       .select('*')
@@ -1174,30 +1161,42 @@ export async function getRoutesPlanForDate(dateStr: string) {
 
       // Allocate clusters to this city's workers and optimize sequence
       cityWorkers.forEach((user, idx) => {
-        const clusterPdvs = cityPdvs.filter(pdv => assignments[pdv.id] === idx)
-        const center = centroids[idx] || { lat: parseFloat(cityPdvs[0]?.latitude || '0'), lng: parseFloat(cityPdvs[0]?.longitude || '0') }
+        const existingPlan = existingMap.get(user.id)
+        if (existingPlan) {
+          suggestedPlans.push({
+            reponedorId: user.id,
+            reponedorName: user.name,
+            sequence: existingPlan.optimized_pos_sequence,
+            published: true,
+            status: existingPlan.status
+          })
+        } else {
+          const clusterPdvs = cityPdvs.filter(pdv => assignments[pdv.id] === idx)
+          const center = centroids[idx] || { lat: parseFloat(cityPdvs[0]?.latitude || '0'), lng: parseFloat(cityPdvs[0]?.longitude || '0') }
 
-        clusterPdvs.sort((a, b) => {
-          const distA = Math.pow(parseFloat(a.latitude) - center.lat, 2) + Math.pow(parseFloat(a.longitude) - center.lng, 2)
-          const distB = Math.pow(parseFloat(b.latitude) - center.lat, 2) + Math.pow(parseFloat(b.longitude) - center.lng, 2)
-          return distA - distB
-        })
+          clusterPdvs.sort((a, b) => {
+            const distA = Math.pow(parseFloat(a.latitude) - center.lat, 2) + Math.pow(parseFloat(a.longitude) - center.lng, 2)
+            const distB = Math.pow(parseFloat(b.latitude) - center.lat, 2) + Math.pow(parseFloat(b.longitude) - center.lng, 2)
+            return distA - distB
+          })
 
-        const maxPdvs = 7 + (idx % 2)
-        const selectedPdvs = clusterPdvs.slice(0, maxPdvs)
-        const optimizedSeq = optimizeSequence(selectedPdvs)
+          const maxPdvs = 7 + (idx % 2)
+          const selectedPdvs = clusterPdvs.slice(0, maxPdvs)
+          const optimizedSeq = optimizeSequence(selectedPdvs)
 
-        suggestedPlans.push({
-          reponedorId: user.id,
-          reponedorName: user.name,
-          sequence: optimizedSeq,
-          published: false,
-          status: 'ASIGNADA'
-        })
+          suggestedPlans.push({
+            reponedorId: user.id,
+            reponedorName: user.name,
+            sequence: optimizedSeq,
+            published: false,
+            status: 'ASIGNADA'
+          })
+        }
       })
     }
 
-    return { published: false, plans: suggestedPlans }
+    const allPublished = (existingPlans || []).length > 0 && (existingPlans || []).length === (users || []).length
+    return { published: allPublished, plans: suggestedPlans }
   } catch (e: any) {
     console.error('Failed to get routes plan for date:', e)
     return { error: e.message || 'Error al obtener planificación.' }
