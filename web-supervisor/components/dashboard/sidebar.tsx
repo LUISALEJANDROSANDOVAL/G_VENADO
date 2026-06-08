@@ -132,7 +132,6 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
     { id: 'users',      label: 'Gestión de Personal', icon: IconUsers },
     { id: 'pdvs',       label: 'Directorio PDVs',     icon: IconDatabase },
     { id: 'audit',      label: 'Auditoría & Logs',    icon: IconShield },
-    { id: 'media',      label: 'Media QA Center',     icon: IconMap },
     { id: 'playground', label: 'Sandbox de Rutas',    icon: IconRoute },
   ] : [
     { id: 'dashboard', label: 'Inicio', icon: IconDashboard },

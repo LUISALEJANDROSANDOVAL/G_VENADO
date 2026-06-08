@@ -726,7 +726,7 @@ export async function reoptimizeRoutes() {
       catAverages[cat] = catCount[cat] > 0 ? (catSum[cat] / catCount[cat]) / 60 : (cat === 'PARETO' ? 50 : cat === 'MAYORISTA' ? 40 : 20)
     })
 
-    // Haversine distance calculator
+    // Haversine distance calculator (Fallback si falla Mapbox)
     function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
       const R = 6371e3
       const dLat = (lat2 - lat1) * Math.PI / 180
@@ -737,7 +737,9 @@ export async function reoptimizeRoutes() {
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
     }
 
-    // Reoptimize sequence for each plan using Nearest Neighbor + Strategic Interleaving
+    const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+
+    // Reoptimize sequence for each plan using Mapbox Matrix API + Strategic Interleaving
     for (const plan of plans) {
       const originalSeq = plan.optimized_pos_sequence || []
       if (originalSeq.length <= 1) continue
@@ -749,41 +751,62 @@ export async function reoptimizeRoutes() {
       
       if (planPdvs.length <= 1) continue
 
-      // Greedy nearest-neighbor with double criterion and load balancing
-      const optimizedSeq: string[] = []
+      // Límite de Mapbox Matrix API es 25 puntos por request
+      const matrixPdvs = planPdvs.slice(0, 25)
       
-      // Start with the first PDV in the original plan as start point
-      let current = planPdvs[0]
+      let durationMatrix: number[][] | null = null
+      
+      // Llamada HTTP a la API oficial de Mapbox Matrix
+      if (MAPBOX_TOKEN && MAPBOX_TOKEN !== 'PEGA_TU_TOKEN_AQUI') {
+        try {
+          const coordinates = matrixPdvs.map(p => `${p.longitude},${p.latitude}`).join(';')
+          const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${coordinates}?annotations=duration&access_token=${MAPBOX_TOKEN}`
+          const res = await fetch(url)
+          const data = await res.json()
+          if (data.code === 'Ok' && data.durations) {
+            durationMatrix = data.durations
+          }
+        } catch (e) {
+          console.error('Mapbox Matrix API error:', e)
+        }
+      }
+
+      // TSP Greedy nearest-neighbor con datos reales de Mapbox
+      const optimizedSeq: string[] = []
+      let currentIdx = 0
+      let current = matrixPdvs[currentIdx]
       optimizedSeq.push(current.id)
       
-      const unvisited = planPdvs.slice(1)
+      const unvisitedIndices = new Set(matrixPdvs.map((_, i) => i).slice(1))
       let lastCategory = current.category
 
-      while (unvisited.length > 0) {
-        let bestIndex = 0
+      while (unvisitedIndices.size > 0) {
+        let bestIndex = -1
         let bestScore = Infinity
 
-        for (let i = 0; i < unvisited.length; i++) {
-          const candidate = unvisited[i]
+        for (const candidateIdx of unvisitedIndices) {
+          const candidate = matrixPdvs[candidateIdx]
           
-          // Distance
-          const dist = getDistance(
-            parseFloat(current.latitude), parseFloat(current.longitude),
-            parseFloat(candidate.latitude), parseFloat(candidate.longitude)
-          )
-          
-          // Historical / Category duration in minutes
-          const duration = catAverages[candidate.category] || 30
-          
-          // Double Criterio: 60% peso duración (normalizado a escala de metros, ej: 1 min = 250m)
-          // 40% peso distancia
-          const normDist = dist // meters
-          const normDur = duration * 250 // scale minutes to meter-equivalent weights
-          
-          let score = 0.4 * normDist + 0.6 * normDur
+          let travelDurationSecs = 0
+          // Si Mapbox respondió correctamente, usamos el tiempo real de conducción en tráfico
+          if (durationMatrix && durationMatrix[currentIdx] && durationMatrix[currentIdx][candidateIdx] !== null) {
+            travelDurationSecs = durationMatrix[currentIdx][candidateIdx]
+          } else {
+            // Fallback a línea recta si falla la API
+            const dist = getDistance(
+              parseFloat(current.latitude), parseFloat(current.longitude),
+              parseFloat(candidate.latitude), parseFloat(candidate.longitude)
+            )
+            travelDurationSecs = dist / 11 // Asumiendo ~40km/h
+          }
 
-          // Strategic Interleaving (RF-03 load balancing):
-          // If last visited was complex (PARETO/MAYORISTA) and current candidate is simple (DETALLISTA/MINORISTA), apply a discount to the score
+          const travelDurationMins = travelDurationSecs / 60
+          const workDurationMins = catAverages[candidate.category] || 30
+          
+          // Doble Criterio Mapbox: 40% tiempo de manejo (tráfico) + 60% tiempo de tarea (retail)
+          let score = (0.4 * travelDurationMins) + (0.6 * workDurationMins)
+
+          // Strategic Interleaving (RF-03 load balancing)
           const isLastComplex = lastCategory === 'PARETO' || lastCategory === 'MAYORISTA'
           const isCandidateSimple = candidate.category === 'DETALLISTA' || candidate.category === 'MINORISTA'
           if (isLastComplex && isCandidateSimple) {
@@ -792,14 +815,20 @@ export async function reoptimizeRoutes() {
 
           if (score < bestScore) {
             bestScore = score
-            bestIndex = i
+            bestIndex = candidateIdx
           }
         }
 
-        current = unvisited[bestIndex]
+        currentIdx = bestIndex
+        current = matrixPdvs[currentIdx]
         optimizedSeq.push(current.id)
         lastCategory = current.category
-        unvisited.splice(bestIndex, 1)
+        unvisitedIndices.delete(bestIndex)
+      }
+      
+      // Adjuntar cualquier PDV sobrante (>25) al final sin optimizar matriz completa
+      if (planPdvs.length > 25) {
+        optimizedSeq.push(...planPdvs.slice(25).map(p => p.id))
       }
 
       const { error: updateErr } = await supabaseAdmin

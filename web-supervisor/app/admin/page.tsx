@@ -11,10 +11,9 @@ import { AdminOverviewTab } from '@/components/dashboard/admin-overview-tab'
 import { AdminUsersTab } from '@/components/dashboard/admin-users-tab'
 import { AdminPdvsTab } from '@/components/dashboard/admin-pdvs-tab'
 import { AdminAuditTab } from '@/components/dashboard/admin-audit-tab'
-import { AdminMediaTab } from '@/components/dashboard/admin-media-tab'
 import { AdminPlaygroundTab } from '@/components/dashboard/admin-playground-tab'
 
-type AdminTab = 'overview' | 'users' | 'pdvs' | 'audit' | 'media' | 'playground'
+type AdminTab = 'overview' | 'users' | 'pdvs' | 'audit' | 'playground'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -186,10 +185,7 @@ export default function AdminDashboard() {
                   />
                 )}
 
-                {/* TAB 4: MEDIA QA */}
-                {activeTab === 'media' && (
-                  <AdminMediaTab />
-                )}
+
 
                 {/* TAB 5: ROUTE SANDBOX */}
                 {activeTab === 'playground' && (
