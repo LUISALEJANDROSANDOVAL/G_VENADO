@@ -12,10 +12,12 @@ class MapboxRouteMap extends StatefulWidget {
     super.key,
     required this.pdvs,
     this.activePdvId,
+    this.isFullscreen = false,
   });
 
   final List<Pdv> pdvs;
   final String? activePdvId;
+  final bool isFullscreen;
 
   @override
   State<MapboxRouteMap> createState() => _MapboxRouteMapState();
@@ -65,19 +67,9 @@ class _MapboxRouteMapState extends State<MapboxRouteMap> {
     // Calcular bounds para centrar la cámara
     final bounds = LatLngBounds.fromPoints(points);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.inputBorder, width: 1),
-      ),
-      child: SizedBox(
-        height: 240,
-        child: Stack(
-          children: [
-            FlutterMap(
+    final mapStack = Stack(
+      children: [
+        FlutterMap(
               mapController: _mapController,
               options: MapOptions(
                 initialCameraFit: CameraFit.bounds(
@@ -132,18 +124,34 @@ class _MapboxRouteMapState extends State<MapboxRouteMap> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.route_outlined, size: 14, color: AppColors.institutionalBlue),
-                    SizedBox(width: 6),
-                    Text(
-                      'Ruta Mapbox Live',
-                      style: TextStyle(fontSize: 11, color: AppColors.primaryText, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Icon(Icons.route_outlined, size: 14, color: AppColors.institutionalBlue),
+                SizedBox(width: 6),
+                Text(
+                  'Ruta Mapbox Live',
+                  style: TextStyle(fontSize: 11, color: AppColors.primaryText, fontWeight: FontWeight.bold),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+
+    if (widget.isFullscreen) {
+      return mapStack;
+    }
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.inputBorder, width: 1),
+      ),
+      child: SizedBox(
+        height: 240,
+        child: mapStack,
       ),
     );
   }

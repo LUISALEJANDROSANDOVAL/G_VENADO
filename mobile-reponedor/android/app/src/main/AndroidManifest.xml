@@ -5,8 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
-    <!-- Enterprise: GPS en segundo plano (pantalla bloqueada) -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <!-- Enterprise: GPS en segundo plano eliminado temporalmente
+         ACCESS_BACKGROUND_LOCATION requiere flujo separado en Android 11+
+         y causa reinicio de actividad que produce el crash al dar permisos -->
 
     <!-- Enterprise: Foreground Service para GPS ininterrumpido -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -50,6 +51,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Foreground Service para GPS -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
