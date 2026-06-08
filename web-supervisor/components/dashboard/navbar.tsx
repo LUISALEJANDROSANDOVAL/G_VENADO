@@ -19,30 +19,37 @@ interface SessionUser {
   role: string
 }
 
-export function Navbar() {
+interface NavbarProps {
+  isAdmin?: boolean
+}
+
+export function Navbar({ isAdmin = false }: NavbarProps) {
   const [currentUser, setCurrentUser] = useState<SessionUser>({
-    name: 'Usuario',
+    name: isAdmin ? 'Administrador del Sistema' : 'Supervisor General',
     email: '',
-    role: 'SUPERVISOR',
+    role: isAdmin ? 'ADMIN' : 'SUPERVISOR',
   })
 
   useEffect(() => {
-    try {
-      const sessionStr = localStorage.getItem('supervisor_session')
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr)
-        setCurrentUser({
-          name: session.name || (session.role === 'ADMIN' ? 'Administrador del Sistema' : 'Supervisor General'),
-          email: session.email || '',
-          role: session.role || 'SUPERVISOR',
-        })
+    const fetchUser = async () => {
+      try {
+        const { createClient } = await import('@/utils/supabase/client')
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          const { data: profile } = await supabase.from('users').select('name, email, role').eq('id', session.user.id).single()
+          setCurrentUser({
+            name: profile?.name || session.user.email || (isAdmin ? 'Administrador del Sistema' : 'Supervisor General'),
+            email: session.user.email || '',
+            role: profile?.role || (isAdmin ? 'ADMIN' : 'SUPERVISOR'),
+          })
+        }
+      } catch (e) {
+        console.error('Error reading auth session in navbar:', e)
       }
-    } catch (e) {
-      console.error('Error reading auth session in navbar:', e)
     }
-  }, [])
-
-  const isAdmin = currentUser.role === 'ADMIN'
+    fetchUser()
+  }, [isAdmin])
 
   const panelTitle = isAdmin ? 'Consola de Administración' : 'Torre de Control'
   const panelSub   = isAdmin ? 'Panel Administrativo'      : 'Operaciones de Campo'
@@ -109,8 +116,10 @@ export function Navbar() {
               <DropdownMenuSeparator className="bg-border my-1" />
               <DropdownMenuItem
                 className="text-rose-500 focus:bg-rose-500/10 focus:text-rose-600 dark:focus:bg-rose-500/20 cursor-pointer flex items-center gap-2 px-2.5 py-2 rounded-lg font-semibold text-xs"
-                onClick={() => {
-                  localStorage.removeItem('supervisor_session')
+                onClick={async () => {
+                  const { createClient } = await import('@/utils/supabase/client')
+                  const supabase = createClient()
+                  await supabase.auth.signOut()
                   window.location.href = '/'
                 }}
               >

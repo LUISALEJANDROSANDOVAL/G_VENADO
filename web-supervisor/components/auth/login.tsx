@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { authenticateUser } from '@/app/actions'
+import { createClient } from '@/utils/supabase/client'
 
 interface LoginProps {
   onLoginSuccess: () => void
@@ -16,6 +16,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const { toast } = useToast()
+  const supabase = createClient()
 
   // Fade-in animation on mount
   useEffect(() => {
@@ -40,30 +41,23 @@ export function Login({ onLoginSuccess }: LoginProps) {
     }
 
     try {
-      const res = await authenticateUser(email, password)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (res.success && res.user) {
-        localStorage.setItem(
-          'supervisor_session',
-          JSON.stringify({
-            email: res.user.email,
-            name: res.user.name,
-            role: res.user.role,
-            rememberMe,
-            timestamp: Date.now()
-          })
-        )
-        toast({
-          title: "¡Acceso concedido!",
-          description: `Bienvenido a la Torre de Control Venado, ${res.user.name}.`,
-        })
-        onLoginSuccess()
-      } else {
+      if (error) {
         toast({
           variant: "destructive",
           title: "Error de credenciales",
-          description: res.error || "Correo o contraseña incorrectos.",
+          description: error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos.' : error.message,
         })
+      } else if (data.user) {
+        toast({
+          title: "¡Acceso concedido!",
+          description: `Bienvenido a la Torre de Control Venado.`,
+        })
+        onLoginSuccess()
       }
     } catch (err: any) {
       toast({
@@ -220,20 +214,6 @@ export function Login({ onLoginSuccess }: LoginProps) {
                   ¿Tiene problemas para ingresar?{' '}
                   <span className="text-on-surface font-bold">soporte@grupovenado.com</span>
                 </p>
-                <div className="bg-outline-variant/10 rounded-xl p-4 space-y-2">
-                  <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Cuentas de acceso disponibles:</p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono text-on-surface">supervisor@gmail.com</span>
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase">Supervisor</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono text-on-surface">administrador@gmail.com</span>
-                      <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold text-[9px] uppercase">Admin</span>
-                    </div>
-                    <p className="text-[10px] text-on-surface-variant mt-1">Contraseña: <span className="font-mono font-bold text-on-surface">12345678</span></p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

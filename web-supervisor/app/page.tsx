@@ -8,6 +8,7 @@ import { AnalyticsCharts } from '@/components/dashboard/analytics-charts'
 import { RouteManagement } from '@/components/dashboard/route-management'
 import { AdminMaster } from '@/components/dashboard/admin-master'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
+import { SupervisorQATab } from '@/components/dashboard/supervisor-qa-tab'
 import dynamic from 'next/dynamic'
 import { Calendar, MapPin, User, Download, ChevronDown, FileText, Table, Globe } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
@@ -63,7 +64,8 @@ import {
   generateAnalyticsData,
   generateRouteOptData,
 } from '@/lib/mock-data'
-import { getDashboardData, seedDatabase, fetchRealAnalytics } from '@/app/actions'
+import { getDashboardData, fetchRealAnalytics, seedDatabase } from '@/app/actions'
+import { createClient } from '@/utils/supabase/client'
 import { supabase } from '@/lib/supabase'
 
 export default function ControlTowerDashboard() {
@@ -97,38 +99,35 @@ export default function ControlTowerDashboard() {
 
   const router = useRouter()
 
-  useEffect(() => {
-    // Check if the user is already logged in
-    const sessionStr = localStorage.getItem('supervisor_session')
-    if (sessionStr) {
-      try {
-        const session = JSON.parse(sessionStr)
-        if (session.role === 'ADMIN') {
-          router.push('/admin')
-        } else if (session.role === 'SUPERVISOR') {
-          setIsLoggedIn(true)
-        } else {
-          setIsLoggedIn(true)
-        }
-      } catch (e) {
-        console.error('Error parsing session:', e)
-        setIsLoggedIn(true)
-      }
-    }
-    setIsCheckingAuth(false)
-  }, [router])
+  const supabase = createClient()
 
-  const handleLoginSuccess = () => {
-    const sessionStr = localStorage.getItem('supervisor_session')
-    if (sessionStr) {
-      try {
-        const session = JSON.parse(sessionStr)
-        if (session.role === 'ADMIN') {
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        // Obtenemos el rol desde los metadatos o la DB. Por ahora validamos que hay sesión.
+        // Si queremos ser estrictos, podemos chequear auth.users metadata o consultar public.users
+        const { data: profile } = await supabase.from('users').select('role').eq('id', session.user.id).single()
+        
+        if (profile?.role === 'ADMIN') {
           router.push('/admin')
         } else {
           setIsLoggedIn(true)
         }
-      } catch (e) {
+      }
+      setIsCheckingAuth(false)
+    }
+    
+    checkSession()
+  }, [router, supabase])
+
+  const handleLoginSuccess = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const { data: profile } = await supabase.from('users').select('role').eq('id', session.user.id).single()
+      if (profile?.role === 'ADMIN') {
+        router.push('/admin')
+      } else {
         setIsLoggedIn(true)
       }
     } else {
@@ -556,6 +555,13 @@ export default function ControlTowerDashboard() {
                       setActiveModule('map')
                     }}
                     onModuleChange={setActiveModule}
+                  />
+                )}
+
+                {/* Supervisor QA Tab */}
+                {activeModule === 'qa' && (
+                  <SupervisorQATab 
+                    photoEvidences={mockData.photoEvidences || []} 
                   />
                 )}
 

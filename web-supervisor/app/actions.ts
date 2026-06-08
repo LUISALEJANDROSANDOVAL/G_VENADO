@@ -514,11 +514,14 @@ export async function getDashboardData() {
           afterUrl: null,
           lat: rawPdv?.latitude ?? null,
           lng: rawPdv?.longitude ?? null,
-          timestamp: log.end_time || log.start_time || new Date().toISOString()
+          timestamp: log.end_time || log.start_time || new Date().toISOString(),
+          qa_status: log.qa_status || 'Pendientes'
         })
       } else {
         // Second photo for the same task/pdv = closing evidence
         evidenceGroupMap.get(groupKey).afterUrl = formatUrl(log.photo_url)
+        // Ensure qa_status is taken from the closing log if it exists
+        if (log.qa_status) evidenceGroupMap.get(groupKey).qa_status = log.qa_status
       }
     })
 
@@ -526,43 +529,6 @@ export async function getDashboardData() {
 
     // Sort by timestamp desc
     photoEvidences.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-    // Seed mock photos if empty — with realistic lat/lng for Santa Cruz, Bolivia
-    if (photoEvidences.length === 0) {
-      const beforePhotos = [
-        'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=600'
-      ]
-      const afterPhotos = [
-        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=600',
-        null, // simula que el reponedor aún no ha subido el cierre
-        'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=600'
-      ]
-      const names = ['Carlos Méndez', 'Ana García', 'José Torres']
-      const pdvsDemo = ['Bodega Central 1', 'Supermercado Norte 2', 'Mini Mercado Centro 1']
-      const tasksDemo = ['Limpieza', 'Bandeo', 'POP']
-      // Approximate coords near Santa Cruz de la Sierra city center
-      const coords = [
-        { lat: -17.7863, lng: -63.1812 },
-        { lat: -17.7791, lng: -63.1742 },
-        { lat: -17.7935, lng: -63.1680 }
-      ]
-
-      for (let i = 0; i < 3; i++) {
-        photoEvidences.push({
-          id: `photo-demo-${i}`,
-          reponedorName: names[i],
-          pdvName: pdvsDemo[i],
-          taskName: tasksDemo[i],
-          beforeUrl: beforePhotos[i],
-          afterUrl: afterPhotos[i],
-          lat: coords[i].lat,
-          lng: coords[i].lng,
-          timestamp: new Date(Date.now() - i * 3600000).toISOString()
-        })
-      }
-    }
 
     // Feedback loop: compare actual task logs duration vs points_of_sale.base_duration_minutes
     const pdvLogTotals: Record<string, { sum: number, count: number }> = {}
@@ -1271,12 +1237,18 @@ export async function publishTomorrowRoutesPlan(plans: any[]) {
 // ─── CRUD Actions for PDVs ───────────────────────────────────────────────────
 
 export async function createPdv(data: any) {
+  console.log('--- START createPdv ---')
+  console.log('Payload received:', JSON.stringify(data, null, 2))
   try {
     const { error } = await supabaseAdmin.from('points_of_sale').insert(data);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('Supabase Error in createPdv:', error)
+      throw new Error(error.message);
+    }
+    console.log('--- SUCCESS createPdv ---')
     return { success: true };
   } catch (e: any) {
-    console.error('Error creating PDV:', e);
+    console.error('Catch Error creating PDV:', e);
     return { error: e.message || 'Error al crear PDV.' };
   }
 }
@@ -1453,66 +1425,8 @@ export async function fetchRealAnalytics(startDateStr?: string, endDateStr?: str
   }
 }
 
-// ─── Local credential store (active while DB auth is being set up) ───────────
-// These are the valid web panel accounts. Password: 12345678
-const LOCAL_CREDENTIALS: Record<string, { name: string; role: string }> = {
-  'supervisor@gmail.com':     { name: 'Supervisor General',        role: 'SUPERVISOR' },
-  'administrador@gmail.com':  { name: 'Administrador del Sistema', role: 'ADMIN' },
-  'supervisor@venado.com':    { name: 'Supervisor General',        role: 'SUPERVISOR' },
-}
-const LOCAL_PASSWORD = '12345678'
 
-export async function authenticateUser(emailInput: string, passwordInput: string) {
-  const email = emailInput.trim().toLowerCase()
-
-  // 1. Try DB RPC first (production path)
-  try {
-    const { data, error } = await supabaseAdmin.rpc('verify_user_credentials', {
-      p_email: email,
-      p_password: passwordInput,
-    })
-
-    if (!error && data && data.length > 0) {
-      const userProfile = data[0]
-      if (userProfile.role_name === 'SUPERVISOR' || userProfile.role_name === 'ADMIN') {
-        return {
-          success: true,
-          user: {
-            id:    userProfile.id,
-            name:  userProfile.name,
-            email: userProfile.email,
-            role:  userProfile.role_name,
-          },
-        }
-      }
-      return { success: false, error: 'Acceso denegado: rol no autorizado para este panel.' }
-    }
-    // If the RPC returns no rows, fall through to local store
-  } catch (rpcError: any) {
-    // RPC might not exist yet in DB — fall through to local store
-    console.warn('DB RPC not available, using local credential store:', rpcError?.message)
-  }
-
-  // 2. Local credential fallback (works without DB setup)
-  const localUser = LOCAL_CREDENTIALS[email]
-  if (!localUser) {
-    return { success: false, error: 'Correo o contraseña incorrectos.' }
-  }
-  if (passwordInput !== LOCAL_PASSWORD) {
-    return { success: false, error: 'Correo o contraseña incorrectos.' }
-  }
-
-  return {
-    success: true,
-    user: {
-      id:    `local-${email}`,
-      name:  localUser.name,
-      email: email,
-      role:  localUser.role,
-    },
-  }
-}
-
+// ─── Authentication handled by Supabase Auth (JWT) ──────────────────────────
 export async function getAdminDashboardData() {
   try {
     const { data: users, error: usersErr } = await supabaseAdmin
@@ -1653,77 +1567,25 @@ export async function adminUpdateUser(id: string, data: any) {
 
 export async function getAdminAuditData() {
   try {
-    const [deviationsRes, usersRes, plansRes, taskLogsRes, activeUsersRes] = await Promise.all([
-      supabaseAdmin.from('route_execution_proofs').select('*, points_of_sale(name)').eq('is_deviation', true).order('created_at', { ascending: false }).limit(20),
-      supabaseAdmin.from('users').select('*').order('created_at', { ascending: false }).limit(20),
-      supabaseAdmin.from('daily_routes_plan').select('*, users(email)').order('created_at', { ascending: false }).limit(20),
-      supabaseAdmin.from('task_logs').select('*, points_of_sale(name)').order('created_at', { ascending: false }).limit(20),
+    const [auditRes, activeUsersRes] = await Promise.all([
+      supabaseAdmin.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
       supabaseAdmin.from('users').select('*').in('role', ['ADMIN', 'SUPERVISOR']).eq('is_active', true)
     ])
 
     const logs: any[] = []
     
-    if (deviationsRes.data) {
-      deviationsRes.data.forEach((d: any) => {
+    if (auditRes.data) {
+      auditRes.data.forEach((a: any) => {
         logs.push({
-          id: `dev-${d.id}`,
-          _time: new Date(d.created_at).getTime(),
-          time: d.created_at,
-          action: 'Desviación de Ruta Detectada',
-          desc: d.deviation_justification || `Desviación reportada en PDV ${d.points_of_sale?.name || d.pos_id}`,
-          user: 'Sistema Automático',
-          severity: 'high',
-          ip: 'Internal',
-          device: 'App Movil'
-        })
-      })
-    }
-
-    if (usersRes.data) {
-      usersRes.data.forEach((u: any) => {
-        logs.push({
-          id: `usr-${u.id}`,
-          _time: new Date(u.created_at).getTime(),
-          time: u.created_at,
-          action: 'Creación/Actualización de Usuario',
-          desc: `El usuario ${u.email} fue registrado con el rol ${u.role}.`,
-          user: 'Administrador',
-          severity: 'low',
-          ip: 'Panel Web',
-          device: 'Navegador Web'
-        })
-      })
-    }
-
-    if (plansRes.data) {
-      plansRes.data.forEach((p: any) => {
-        logs.push({
-          id: `plan-${p.id}`,
-          _time: new Date(p.created_at).getTime(),
-          time: p.created_at,
-          action: 'Generación de Ruta',
-          desc: `Ruta asignada a ${p.users?.email || 'Reponedor'} en estado ${p.status}.`,
-          user: 'Algoritmo de Ruteo',
-          severity: 'low',
+          id: a.id,
+          _time: new Date(a.created_at).getTime(),
+          time: a.created_at,
+          action: a.action,
+          desc: a.description,
+          user: a.action === 'Algoritmo de Ruteo' || a.action.includes('Ruta') ? 'Sistema Automático' : 'Trazabilidad BD',
+          severity: a.severity,
           ip: 'Servidor',
-          device: 'Worker NodeJS'
-        })
-      })
-    }
-
-    if (taskLogsRes.data) {
-      taskLogsRes.data.forEach((t: any) => {
-        const isSuspicious = t.is_offline || (t.duration_seconds && t.duration_seconds < 120)
-        logs.push({
-          id: `task-${t.id}`,
-          _time: new Date(t.created_at).getTime(),
-          time: t.created_at,
-          action: isSuspicious ? 'Tarea Atípica en PDV' : 'Ejecución de Tarea',
-          desc: `Se ejecutó tarea en ${t.points_of_sale?.name || 'PDV'}${isSuspicious ? ' bajo condiciones anómalas.' : '.'}`,
-          user: 'Reponedor',
-          severity: isSuspicious ? 'medium' : 'low',
-          ip: 'Red Móvil',
-          device: 'App Movil'
+          device: 'PostgreSQL Trigger'
         })
       })
     }
@@ -1731,7 +1593,7 @@ export async function getAdminAuditData() {
     logs.sort((a, b) => b._time - a._time)
 
     const now = new Date().getTime()
-    const auditLogs = logs.slice(0, 100).map(log => {
+    const auditLogs = logs.map(log => {
       const diffMinutes = Math.floor((now - log._time) / 60000)
       let timeStr = 'Hace un momento'
       if (diffMinutes > 0 && diffMinutes < 60) timeStr = `Hace ${diffMinutes} min`
@@ -1744,19 +1606,34 @@ export async function getAdminAuditData() {
       }
     })
 
-    const activeSessions = (activeUsersRes.data || []).map((u: any) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      ip: `190.${Math.floor(Math.random() * 100)}.${Math.floor(Math.random() * 255)}.x`
-    }))
+    const { data: authUsersRes } = await supabaseAdmin.auth.admin.listUsers()
+
+    let activeSessions: any[] = []
+    
+    if (authUsersRes && authUsersRes.users && activeUsersRes.data) {
+      // Consider "active" if signed in within the last 12 hours
+      const recentUsers = authUsersRes.users.filter(u => {
+        if (!u.last_sign_in_at) return false
+        return (now - new Date(u.last_sign_in_at).getTime()) < 12 * 60 * 60 * 1000
+      })
+      
+      activeSessions = recentUsers.map(u => {
+        const publicUser = activeUsersRes.data.find((pu: any) => pu.email === u.email)
+        return {
+          id: u.id,
+          name: publicUser?.name || u.email,
+          email: u.email,
+          role: publicUser?.role || 'SUPERVISOR',
+          ip: `190.${Math.floor(Math.random() * 100)}.${Math.floor(Math.random() * 255)}.x`
+        }
+      })
+    }
 
     const auditStats = {
-      securityActions: deviationsRes.data?.length || 0,
+      securityActions: auditLogs.filter(l => l.severity === 'high').length,
       activeSessionsCount: activeSessions.length,
       failedAttempts: 0,
-      algorithmLogs: plansRes.data?.length || 0
+      algorithmLogs: auditLogs.filter(l => l.action.includes('Ruta') || l.action.includes('Algoritmo') || l.action.includes('Planificación')).length
     }
 
     return {
@@ -1768,5 +1645,22 @@ export async function getAdminAuditData() {
   } catch (e: any) {
     console.error('Error in getAdminAuditData:', e)
     return { success: false, error: e.message || 'Error al cargar bitácora.' }
+  }
+}
+
+// ─── QA Status Management ───────────────────────────────────────────
+export async function updateQaStatus(taskId: string, status: 'Aprobado' | 'Rechazado') {
+  try {
+    const { error } = await supabaseAdmin
+      .from('task_logs')
+      .update({ qa_status: status })
+      .eq('id', taskId)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (e: any) {
+    console.error('Error updating QA status:', e)
+    return { error: e.message }
   }
 }

@@ -85,6 +85,7 @@ interface SidebarProps {
   activeModule: string
   onModuleChange: (module: string) => void
   activeReponedoresCount?: number
+  isAdmin?: boolean
 }
 
 // Custom SVG Logo Icon drawing 4 diamonds arranged in a cross
@@ -103,31 +104,18 @@ function LogoIcon({ className }: { className?: string }) {
   )
 }
 
-export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount, isAdmin = false }: SidebarProps) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const [userRole, setUserRole] = useState<string>('SUPERVISOR')
-
-  // Avoid SSR hydration mismatch and detect role
+  // Avoid SSR hydration mismatch
   useEffect(() => {
     setMounted(true)
-    try {
-      const sessionStr = localStorage.getItem('supervisor_session')
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr)
-        if (session.role) {
-          setUserRole(session.role)
-        }
-      }
-    } catch (e) {
-      console.error('Error reading role in sidebar:', e)
-    }
   }, [])
 
-  const modules = userRole === 'ADMIN' ? [
+  const modules = isAdmin ? [
     { id: 'overview',   label: 'Resumen General',    icon: IconDashboard },
     { id: 'users',      label: 'Gestión de Personal', icon: IconUsers },
     { id: 'pdvs',       label: 'Directorio PDVs',     icon: IconDatabase },
@@ -136,6 +124,7 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
   ] : [
     { id: 'dashboard', label: 'Inicio', icon: IconDashboard },
     { id: 'map', label: 'Mapa en Vivo', icon: IconMap },
+    { id: 'qa', label: 'Control QA', icon: IconShield },
     { id: 'routes', label: 'Control de Rutas', icon: IconRoute },
     { id: 'analytics', label: 'Reportes y Gráficos', icon: IconAnalytics },
     { id: 'pdv', label: 'Directorio de Tiendas', icon: IconDatabase },
@@ -358,8 +347,10 @@ export function Sidebar({ activeModule, onModuleChange, activeReponedoresCount }
                 Cancelar
               </Button>
               <Button
-                onClick={() => {
-                  localStorage.removeItem('supervisor_session')
+                onClick={async () => {
+                  const { createClient } = await import('@/utils/supabase/client')
+                  const supabase = createClient()
+                  await supabase.auth.signOut()
                   window.location.href = '/'
                 }}
                 className="h-9 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-sm border-none cursor-pointer"

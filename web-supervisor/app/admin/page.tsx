@@ -15,9 +15,12 @@ import { AdminPlaygroundTab } from '@/components/dashboard/admin-playground-tab'
 
 type AdminTab = 'overview' | 'users' | 'pdvs' | 'audit' | 'playground'
 
+import { createClient } from '@/utils/supabase/client'
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createClient()
 
   // Auth state
   const [isAdmin, setIsAdmin] = useState(false)
@@ -37,16 +40,17 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview')
 
   useEffect(() => {
-    // Strict Auth Verification — redirect to login if no session or wrong role
-    const sessionStr = localStorage.getItem('supervisor_session')
-    if (!sessionStr) {
-      router.push('/')
-      return
-    }
+    const checkAdminAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push('/')
+        return
+      }
 
-    try {
-      const session = JSON.parse(sessionStr)
-      if (session.role !== 'ADMIN') {
+      const { data: profile } = await supabase.from('users').select('name, email, role').eq('id', session.user.id).single()
+
+      if (!profile || profile.role !== 'ADMIN') {
         toast({
           variant: 'destructive',
           title: 'Acceso denegado',
@@ -55,15 +59,18 @@ export default function AdminDashboard() {
         router.push('/')
         return
       }
+
       setIsAdmin(true)
-      setAdminUser(session)
-    } catch {
-      router.push('/')
-      return
-    } finally {
+      setAdminUser({
+        name: profile.name || session.user.email,
+        email: session.user.email,
+        role: profile.role
+      })
       setIsCheckingAuth(false)
     }
-  }, [router, toast])
+
+    checkAdminAuth()
+  }, [router, supabase, toast])
 
   const loadData = async () => {
     setIsLoadingData(true)
@@ -128,13 +135,14 @@ export default function AdminDashboard() {
       <Sidebar
         activeModule={activeTab}
         onModuleChange={(tab) => setActiveTab(tab as AdminTab)}
+        isAdmin={true}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Navbar — identical to supervisor panel */}
+        {/* Top Navigation */}
         <div className="shrink-0">
-          <Navbar />
+          <Navbar isAdmin={true} />
         </div>
 
         {/* Content — same padding structure as supervisor page.tsx */}

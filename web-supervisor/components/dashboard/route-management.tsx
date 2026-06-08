@@ -9,6 +9,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { RouteOptData } from '@/lib/mock-data'
 import { reoptimizeRoutes, reassignPdv, approveLogisticAdjustment, getRoutesPlanForDate, publishRoutesPlanForDate, addPdvToRoute, removePdvFromRoute } from '@/app/actions'
 import { useToast } from '@/hooks/use-toast'
@@ -1172,24 +1173,27 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                           {/* Reassign select dropdown & paperplane button */}
                           {reponedores && reponedores.length > 0 && (
                             <div className="flex items-center gap-1.5 flex-1 max-w-[240px] justify-end">
-                              <select
+                              <Select
                                 value={currentSelected}
-                                onChange={(e) => handleSelectTarget(pdv.id, e.target.value)}
-                                className="w-full bg-muted/40 border border-border text-foreground text-[10px] rounded px-2.5 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary transition-all font-semibold"
+                                onValueChange={(value) => handleSelectTarget(pdv.id, value)}
                               >
-                                <option value="">Re-asignar a...</option>
-                                {reponedores
-                                  .filter(w => w.name !== pdv.assignedWorker && w.status !== 'Completado')
-                                  .map(w => {
-                                    const isRec = recommended && (w.id === recommended.id || w.dbUuid === recommended.dbUuid);
-                                    return (
-                                      <option key={w.dbUuid || w.id} value={w.dbUuid || w.id}>
-                                        {isRec ? '⭐ ' : ''}{w.name}
-                                      </option>
-                                    );
-                                  })
-                                }
-                              </select>
+                                <SelectTrigger className="w-[140px] h-8 text-[10px] bg-muted/40 font-semibold border-border">
+                                  <SelectValue placeholder="Re-asignar a..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {reponedores
+                                    .filter(w => w.name !== pdv.assignedWorker && w.status !== 'Completado')
+                                    .map(w => {
+                                      const isRec = recommended && (w.id === recommended.id || w.dbUuid === recommended.dbUuid);
+                                      return (
+                                        <SelectItem key={w.dbUuid || w.id} value={w.dbUuid || w.id} className="text-[11px]">
+                                          {isRec ? '⭐ ' : ''}{w.name}
+                                        </SelectItem>
+                                      );
+                                    })
+                                  }
+                                </SelectContent>
+                              </Select>
                               <button 
                                 onClick={() => handleConfirmReassign(pdv.id)}
                                 disabled={!currentSelected || isReassigning}
@@ -1749,15 +1753,13 @@ export function RouteManagement({ data, reponedores, photoEvidences = [], pdvs =
                                   handleAssignWorkerRoute(p.reponedorId, p.reponedorName)
                                 }
                               }}
-                              disabled={isAssigningWorker === p.reponedorId || (plannedCount === 0 && !(tomorrowPublished || assignedWorkers[p.reponedorId] || p.published))}
+                              disabled={isAssigningWorker === p.reponedorId}
                               className={[
                                 "flex items-center gap-1.5 text-[10px] font-extrabold px-3.5 py-2 rounded-xl border transition-all duration-200 shrink-0 cursor-pointer shadow-3xs",
                                 (tomorrowPublished || assignedWorkers[p.reponedorId] || p.published)
                                   ? (editingWorkerId === p.reponedorId)
                                     ? "bg-emerald-500 hover:bg-emerald-600 text-white border-transparent"
                                     : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-750"
-                                  : plannedCount === 0
-                                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500"
                                   : "bg-[#0B2545] hover:bg-[#163861] text-white border-transparent hover:scale-105 active:scale-95"
                               ].join(" ")}
                             >

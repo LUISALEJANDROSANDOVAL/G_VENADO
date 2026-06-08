@@ -117,21 +117,27 @@ export function PDVsTab({ pdvs, photoEvidences = [], onRefresh }: PDVMasterProps
       base_duration_minutes: parseInt(pdvFormData.base_duration_minutes)
     }
 
-    let res;
-    if (editPdvData) {
-      res = await updatePdv(editPdvData.id, payload)
-    } else {
-      const newId = `PDV-${Math.floor(1000 + Math.random() * 9000)}`
-      res = await createPdv({ ...payload, id: newId })
-    }
-    setIsSavingPdv(false)
+    try {
+      let res;
+      if (editPdvData) {
+        res = await updatePdv(editPdvData.id, payload)
+      } else {
+        const newId = `PDV-${Math.floor(1000 + Math.random() * 9000)}`
+        res = await createPdv({ ...payload, id: newId })
+      }
 
-    if (res.error) {
-      toast({ title: 'Error', description: res.error, variant: 'destructive' })
-    } else {
-      toast({ title: 'Éxito', description: editPdvData ? 'PDV actualizado.' : 'PDV creado.' })
-      setIsPdvModalOpen(false)
-      if (onRefresh) onRefresh()
+      if (res.error) {
+        toast({ title: 'Error', description: res.error, variant: 'destructive' })
+      } else {
+        toast({ title: 'Éxito', description: editPdvData ? 'PDV actualizado.' : 'PDV creado.' })
+        setIsPdvModalOpen(false)
+        if (onRefresh) onRefresh()
+      }
+    } catch (e: any) {
+      console.error('Server Action crash:', e)
+      toast({ title: 'Error de Red', description: 'Por favor refresca la página (F5) y vuelve a intentarlo. El servidor se actualizó.', variant: 'destructive' })
+    } finally {
+      setIsSavingPdv(false)
     }
   }
 
