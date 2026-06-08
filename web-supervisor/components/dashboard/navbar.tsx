@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, Settings, User, LogOut, ShieldCheck } from 'lucide-react'
+import { User, LogOut, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -73,16 +73,7 @@ export function Navbar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-xs text-destructive-foreground flex items-center justify-center text-[10px]">
-              3
-            </span>
-          </Button>
 
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
 
           {/* User profile dropdown */}
           <DropdownMenu>
